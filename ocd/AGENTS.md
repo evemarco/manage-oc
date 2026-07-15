@@ -58,7 +58,7 @@ v vet .
 
 ## NOTES
 
-- `ocd/common.v` is a copy of the shared protocol definitions in the repo root; keep it in sync with `common.v` and `oc/common.v`.
+- `ocd/common.v` is a symlink to the shared protocol definitions in the root `common.v`.
 - The daemon writes to `/run/ocd`, which must exist and be writable by the user running `ocd`.
 - `openchamber` will never be started by `App.tick` if opencode is not healthy; restarting opencode automatically cascades to stopping openchamber first.
 - Logs are written per-process to files under the configured log directory; the `logs` command streams the tail of those files over the Unix socket.

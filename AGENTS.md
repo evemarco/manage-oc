@@ -13,7 +13,7 @@ It consists of a Unix-socket daemon (`ocd`), a CLI client (`oc`), and a tiny `pr
 
 ```
 .
-├── common.v           # duplicated socket/protocol definitions (also in oc/, ocd/)
+├── common.v           # shared socket/protocol definitions (symlinked from oc/, ocd/)
 ├── build.sh           # compiles ocd & oc to /usr/local/bin
 ├── oc/
 │   ├── common.v       # same as root common.v
@@ -64,7 +64,7 @@ It consists of a Unix-socket daemon (`ocd`), a CLI client (`oc`), and a tiny `pr
 - **Indentation:** tabs (enforced by `v fmt`).
 - **String emptiness:** use `s == ''` / `s != ''` (not `s.len == 0` / `s.len > 0`).
 - **Module:** every `.v` file is `module main`; no V modules/packages used.
-- **Shared code:** `common.v` is duplicated into `oc/`, `ocd/`, and root. Editing one requires manual sync of the others.
+- **Shared code:** `oc/common.v` and `ocd/common.v` are symlinks to the root `common.v`. Editing the root file is enough.
 - **C interop:** socket/bind/listen/accept declared in V via `fn C.*` and used in `unsafe` blocks.
 - **Error handling:** `or { return / continue / default }` pattern; propagation via JSON `AckResp`.
 
@@ -115,7 +115,7 @@ procwd <pid|name>
 
 ## NOTES
 
-- `common.v` is **not** a shared V module; it is copy-pasted. Consider extracting a real V module if the project grows.
+- `common.v` is **not** a shared V module; it is reused via symlinks from `oc/` and `ocd/`. Consider extracting a real V module if the project grows.
 - The `ocd` daemon writes to `/run/ocd`, which usually requires root or a prepared directory.
 - `procwd` is a standalone helper; it does not talk to the daemon and is not built by `build.sh`.
 - The codegraph index in this workspace spans multiple projects, so `codegraph_*` queries may return unrelated symbols; prefer direct file reads for this repo.

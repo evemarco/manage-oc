@@ -39,5 +39,5 @@ oc shutdown
 
 ## NOTES
 - `do_logs` uses `__END__` as a sentinel for non-follow mode; do not remove it.
-- `common.v` is a copy, not a module; changes here must be mirrored in `ocd/common.v` and the root `common.v`.
+- `oc/common.v` is a symlink to the root `common.v`, not a module; changes only need to be made in the root file.
 - Unknown commands and usage errors exit with code 2; daemon or protocol errors exit with code 1.

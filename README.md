@@ -240,7 +240,7 @@ ocd --daemon
 
 ## Project notes
 
-- Every `.v` file declares `module main`; there are no shared V modules. The shared `common.v` file (socket helpers and protocol types) exists in three identical copies: the repository root, `oc/`, and `ocd/`. Any protocol change must be manually synced across all three.
+- Every `.v` file declares `module main`; there are no shared V modules. The `common.v` file at the repository root is reused in `oc/` and `ocd/` via symlinks. Any protocol change only needs to be made in the root `common.v`.
 - The root `common.v` is **not** used by the builds; `oc/` and `ocd/` compile only their own directory contents.
 - Unix socket operations are done with inline C bindings (`fn C.*`) because V does not have a native `AF_UNIX` API.
 - The daemon uses C globals in `ocd/globals.h` so that the `SIGTERM`/`SIGINT` handler can cleanly kill the supervised process groups and remove the socket/pidfile.
