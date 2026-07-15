@@ -5,7 +5,7 @@ import net
 import time
 import json
 
-#include "/data/manage-oc/ocd/globals.h"
+#include "globals.h"
 
 // C-side accessors for the globals shared with the signal handler.
 fn C.ocd_get_listen() int
