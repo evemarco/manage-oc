@@ -42,7 +42,7 @@ It consists of a Unix-socket daemon (`ocd`), a CLI client (`oc`), and a tiny `pr
 
 | Symbol | Type | Location | Role |
 |--------|------|----------|------|
-| `main` | fn | `ocd/ocd.v:801` | forks via `daemonize` unless `--daemon` |
+| `main` | fn | `ocd/ocd.v:801` | forks via `daemonize` unless `--foreground`/`--no-daemon` |
 | `run_daemon` | fn | `ocd/ocd.v:720` | pidfile, socket, signal setup, `App.run()` |
 | `App` | struct | `ocd/ocd.v:245` | supervisor state: procs, channels, listen fd |
 | `App.run` | fn | `ocd/ocd.v:698` | `select` on req / death / tick channels |
@@ -97,7 +97,8 @@ v vet .
 ocd
 
 # Run daemon in foreground-ish mode for debugging
-ocd --daemon
+ocd --foreground
+ocd --no-daemon
 
 # CLI usage
 oc status

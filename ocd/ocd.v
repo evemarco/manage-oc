@@ -4,6 +4,7 @@ import os
 import net
 import time
 import json
+import v.vmod
 
 #include "globals.h"
 
@@ -260,9 +261,24 @@ struct DeathMsg {
 	pid  int
 }
 
-fn in_args(args []string, target string) bool {
+const daemonized_flag = '--__daemonized'
+
+fn is_foreground_flag(s string) bool {
+	return s == '--foreground' || s == '--no-daemon'
+}
+
+fn has_foreground_flag(args []string) bool {
 	for a in args {
-		if a == target {
+		if is_foreground_flag(a) {
+			return true
+		}
+	}
+	return false
+}
+
+fn has_daemonized_flag(args []string) bool {
+	for a in args {
+		if a == daemonized_flag {
 			return true
 		}
 	}
@@ -283,9 +299,9 @@ fn backoff_for(n int) int {
 // ---------------- daemonization ----------------
 fn daemonize(args []string) {
 	exe := os.executable()
-	mut sargs := ['--fork', exe, '--daemon']
+	mut sargs := ['--fork', exe, daemonized_flag]
 	for i := 1; i < args.len; i++ {
-		if args[i] == '--daemon' {
+		if is_foreground_flag(args[i]) || args[i] == daemonized_flag {
 			continue
 		}
 		sargs << args[i]
@@ -800,9 +816,23 @@ fn run_daemon(args []string) {
 
 fn main() {
 	args := os.args
-	if !in_args(args, '--daemon') {
-		daemonize(args)
+	for a in args {
+		if a == '--version' {
+			vm := vmod.decode(@VMOD_FILE) or {
+				eprintln('ocd: cannot read v.mod: ' + err.msg())
+				exit(1)
+			}
+			println('ocd ' + vm.version)
+			exit(0)
+		}
+	}
+	if has_foreground_flag(args) {
+		run_daemon(args)
 		return
 	}
-	run_daemon(args)
+	if has_daemonized_flag(args) {
+		run_daemon(args)
+		return
+	}
+	daemonize(args)
 }

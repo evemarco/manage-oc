@@ -82,10 +82,12 @@ Requirements:
 ocd
 ```
 
-By default `ocd` backgrounds itself. To run in the foreground for debugging:
+By default `ocd` backgrounds itself. `ocd --daemon` is equivalent and exists for explicit scripts. To run in the foreground for debugging:
 
 ```bash
-ocd --daemon
+ocd --foreground
+# or
+ocd --no-daemon
 ```
 
 Set the initial working directory on startup:
@@ -119,6 +121,7 @@ Or send `SIGTERM` / `SIGINT` to the daemon process.
 oc status
 oc cwd
 oc cwd set /some/dir
+oc cwd /some/dir
 oc start   [opencode|openchamber|all]
 oc stop    [opencode|openchamber|all]
 oc restart [opencode|openchamber|all]
@@ -139,6 +142,7 @@ Get or set the working directory used by the supervised processes:
 ```bash
 oc cwd
 oc cwd set /root/my-project
+oc cwd /root/my-project
 ```
 
 Restart `opencode` (and automatically restart `openchamber` because it depends on it):
@@ -235,7 +239,10 @@ v vet .
 Run the daemon in the foreground for debugging:
 
 ```bash
-ocd --daemon
+ocd --foreground
+# or
+ocd --no-daemon
+```
 ```
 
 ## Project notes
@@ -248,4 +255,4 @@ ocd --daemon
 
 ## License
 
-No license is specified in this repository.
+MIT

@@ -2,6 +2,7 @@ module main
 
 import os
 import json
+import v.vmod
 
 fn c_connect(path string) int {
 	fd := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
@@ -24,7 +25,7 @@ fn c_connect(path string) int {
 fn usage() {
 	eprintln('usage:')
 	eprintln('  oc status')
-	eprintln('  oc cwd [set <dir>]')
+	eprintln('  oc cwd [set <dir>] | <dir>')
 	eprintln('  oc restart [opencode|openchamber|all]')
 	eprintln('  oc stop    [opencode|openchamber|all]')
 	eprintln('  oc start   [opencode|openchamber|all]')
@@ -103,26 +104,26 @@ fn do_cwd(rest []string) {
 		println('cwd: ' + ack.msg)
 		return
 	}
+	mut dir := ''
 	if rest[0] == 'set' {
 		if rest.len < 2 {
 			eprintln('oc: usage: oc cwd set <dir>')
 			exit(2)
 		}
-		resp := send_recv_one(Command{ op: 'cwd', arg: 'set', target: rest[1] })
-		ack := json.decode(AckResp, resp) or {
-			eprintln('oc: bad response: ' + resp)
-			exit(1)
-		}
-		if !ack.ok {
-			eprintln('oc: ' + ack.msg)
-			exit(1)
-		}
-		println(ack.msg)
-		return
+		dir = rest[1]
+	} else {
+		dir = rest[0]
 	}
-	eprintln('oc: unknown cwd subcommand: ' + rest[0])
-	usage()
-	exit(2)
+	resp := send_recv_one(Command{ op: 'cwd', arg: 'set', target: dir })
+	ack := json.decode(AckResp, resp) or {
+		eprintln('oc: bad response: ' + resp)
+		exit(1)
+	}
+	if !ack.ok {
+		eprintln('oc: ' + ack.msg)
+		exit(1)
+	}
+	println(ack.msg)
 }
 
 fn do_simple(op string, args []string) {
@@ -192,6 +193,16 @@ fn do_logs(rest []string) {
 
 fn main() {
 	args := os.args
+	for a in args {
+		if a == '--version' {
+			vm := vmod.decode(@VMOD_FILE) or {
+				eprintln('oc: cannot read v.mod: ' + err.msg())
+				exit(1)
+			}
+			println('oc ' + vm.version)
+			exit(0)
+		}
+	}
 	if args.len < 2 {
 		usage()
 		exit(2)

@@ -1,5 +1,15 @@
 import os
 import strconv
+import v.vmod
+
+fn print_version() {
+	vm := vmod.decode(@VMOD_FILE) or {
+		eprintln('procwd: cannot read v.mod: ' + err.msg())
+		exit(1)
+	}
+	println('procwd ' + vm.version)
+	exit(0)
+}
 
 fn is_pid(s string) bool {
 	if s == '' {
@@ -48,6 +58,9 @@ fn cwd_of(pid int) !string {
 }
 
 fn main() {
+	if os.args.len >= 2 && os.args[1] == '--version' {
+		print_version()
+	}
 	if os.args.len < 2 {
 		eprintln('usage: procd <pid|name> [pid|name...]')
 		exit(2)
