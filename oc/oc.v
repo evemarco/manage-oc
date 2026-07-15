@@ -1,0 +1,228 @@
+module main
+
+import os
+import json
+
+fn c_connect(path string) int {
+	fd := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
+	if fd < 0 {
+		return -1
+	}
+	unsafe {
+		addr := &C.sockaddr_un{}
+		C.memset(addr, 0, int(sizeof(C.sockaddr_un)))
+		addr.sun_family = u16(C.AF_UNIX)
+		C.strcpy(&addr.sun_path[0], path.str)
+		if C.connect(fd, addr, int(sizeof(C.sockaddr_un))) != 0 {
+			C.close(fd)
+			return -1
+		}
+	}
+	return fd
+}
+
+fn usage() {
+	eprintln('usage:')
+	eprintln('  oc status')
+	eprintln('  oc cwd [set <dir>]')
+	eprintln('  oc restart [opencode|openchamber|all]')
+	eprintln('  oc stop    [opencode|openchamber|all]')
+	eprintln('  oc start   [opencode|openchamber|all]')
+	eprintln('  oc logs    [opencode|openchamber] [-f] [tail N]')
+	eprintln('  oc shutdown')
+}
+
+fn connect() int {
+	fd := c_connect(sock_path)
+	if fd < 0 {
+		eprintln('oc: ocd not started (no socket at ' + sock_path + ')')
+		exit(1)
+	}
+	return fd
+}
+
+fn is_int(s string) bool {
+	if s == '' {
+		return false
+	}
+	for ch in s {
+		if ch < `0` || ch > `9` {
+			return false
+		}
+	}
+	return true
+}
+
+// send a command and read a single JSON response line.
+fn send_recv_one(cmd Command) string {
+	fd := connect()
+	defer { c_close(fd) }
+	c_send_str(fd, json.encode(cmd) + '\n')
+	return c_recv_line(fd)
+}
+
+fn pad(s string, n int) string {
+	mut r := s
+	for r.len < n {
+		r += ' '
+	}
+	return r
+}
+
+fn do_status() {
+	resp := send_recv_one(Command{ op: 'status' })
+	st := json.decode(StatusResp, resp) or {
+		eprintln('oc: bad response: ' + resp)
+		exit(1)
+	}
+	println('Daemon pid : ' + st.daemon_pid.str())
+	println('CWD        : ' + st.cwd)
+	println('')
+	println(pad('PROC', 12) + pad('PID', 8) + pad('STATE', 10) + pad('LISTEN', 8) + pad('CWD', 23) +
+		pad('UPTIME', 9) + 'RESTARTS')
+	println('-------------------------------------------------------------------------------')
+	for p in st.procs {
+		mut uptime := p.uptime_sec.str() + 's'
+		if p.uptime_sec >= 60 {
+			uptime = '${p.uptime_sec / 60}m${p.uptime_sec % 60}s'
+		}
+		listen := if p.listening { 'yes' } else { 'no' }
+		cwd := if p.cwd.len > 0 { p.cwd } else { '-' }
+		println(pad(p.name, 12) + pad(p.pid.str(), 8) + pad(p.state, 10) + pad(listen, 8) +
+			pad(cwd, 23) + pad(uptime, 9) + p.restarts.str())
+	}
+}
+
+fn do_cwd(rest []string) {
+	if rest.len == 0 {
+		resp := send_recv_one(Command{ op: 'cwd', arg: 'get' })
+		ack := json.decode(AckResp, resp) or {
+			eprintln('oc: bad response: ' + resp)
+			exit(1)
+		}
+		println('cwd: ' + ack.msg)
+		return
+	}
+	if rest[0] == 'set' {
+		if rest.len < 2 {
+			eprintln('oc: usage: oc cwd set <dir>')
+			exit(2)
+		}
+		resp := send_recv_one(Command{ op: 'cwd', arg: 'set', target: rest[1] })
+		ack := json.decode(AckResp, resp) or {
+			eprintln('oc: bad response: ' + resp)
+			exit(1)
+		}
+		if !ack.ok {
+			eprintln('oc: ' + ack.msg)
+			exit(1)
+		}
+		println(ack.msg)
+		return
+	}
+	eprintln('oc: unknown cwd subcommand: ' + rest[0])
+	usage()
+	exit(2)
+}
+
+fn do_simple(op string, args []string) {
+	mut target := ''
+	if args.len > 2 {
+		target = args[2]
+	}
+	resp := send_recv_one(Command{ op: op, target: target })
+	ack := json.decode(AckResp, resp) or {
+		eprintln('oc: bad response: ' + resp)
+		exit(1)
+	}
+	println(ack.msg)
+}
+
+fn do_logs(rest []string) {
+	mut proc := 'opencode'
+	mut tailn := ''
+	mut follow := false
+	mut i := 0
+	for i < rest.len {
+		a := rest[i]
+		if a == '-f' {
+			follow = true
+		} else if a == 'tail' {
+			if i + 1 < rest.len {
+				tailn = rest[i + 1]
+				i++
+			}
+		} else if is_int(a) {
+			tailn = a
+		} else {
+			proc = a
+		}
+		i++
+	}
+	cmd := Command{
+		op:     'logs'
+		target: proc
+		arg:    tailn
+		arg2:   if follow { 'follow' } else { '' }
+	}
+	fd := connect()
+	defer { c_close(fd) }
+	c_send_str(fd, json.encode(cmd) + '\n')
+	if follow {
+		for {
+			line := c_recv_line(fd)
+			if line.len == 0 {
+				break
+			}
+			println(line)
+		}
+	} else {
+		for {
+			line := c_recv_line(fd)
+			if line == '__END__' {
+				break
+			}
+			if line.len == 0 {
+				break
+			}
+			println(line)
+		}
+	}
+}
+
+fn main() {
+	args := os.args
+	if args.len < 2 {
+		usage()
+		exit(2)
+	}
+	sub := args[1]
+	match sub {
+		'status' {
+			do_status()
+		}
+		'cwd' {
+			do_cwd(args[2..])
+		}
+		'restart' {
+			do_simple('restart', args)
+		}
+		'stop' {
+			do_simple('stop', args)
+		}
+		'start' {
+			do_simple('start', args)
+		}
+		'logs' {
+			do_logs(args[2..])
+		}
+		'shutdown' {
+			do_simple('shutdown', args)
+		}
+		else {
+			eprintln('oc: unknown command: ' + sub)
+			usage()
+			exit(2)
+		}
+	}
+}

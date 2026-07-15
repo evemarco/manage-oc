@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up V
+        uses: vlang/setup-v@v1
+        with:
+          stable: false
+
+      - name: Build binaries
+        run: |
+          mkdir -p dist/manage-oc-linux-x64
+          v -prod ocd/ -o dist/manage-oc-linux-x64/ocd
+          v -prod oc/ -o dist/manage-oc-linux-x64/oc
+          v -prod procwd/ -o dist/manage-oc-linux-x64/procwd
+
+      - name: Package binaries
+        run: |
+          cd dist
+          tar -czf manage-oc-linux-x64.tar.gz manage-oc-linux-x64
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/manage-oc-linux-x64.tar.gz
+          generate_release_notes: true

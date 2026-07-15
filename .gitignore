@@ -1,0 +1,15 @@
+# Compiled binaries
+procwd/procwd
+*.exe
+
+# OpenCode session state
+.omo/
+
+# CodeGraph index / symlink
+.codegraph
+
+# V build artifacts
+*.tmp
+*.o
+*.so
+*.a
