@@ -19,7 +19,7 @@ jobs:
       - name: Set up V
         uses: vlang/setup-v@v1
         with:
-          stable: true
+          version: e29bc95
 
       - name: Build binaries
         run: |
