@@ -68,8 +68,8 @@ fn build_env(conf map[string]string, is_opencode bool) map[string]string {
 	for k, v in conf {
 		env[k] = v
 	}
-	if is_opencode {
-		env['OPENCODE_SKIP_START'] = 'false'
+	if !is_opencode {
+		env['OPENCODE_SKIP_START'] = 'true'
 	}
 	return env
 }
