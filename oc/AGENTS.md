@@ -12,7 +12,7 @@
 | `connect` | `oc.v:35` | wraps `c_connect`; exits if socket missing |
 | `send_recv_one` | `oc.v:57` | sends one JSON command and reads one response |
 | `do_status` | `oc.v:72` | pretty-prints daemon status table |
-| `do_cwd` | `oc.v:96` | `oc cwd` and `oc cwd set <dir>` |
+| `do_cwd` | `oc.v:96` | `oc cwd` and `oc cwd set [dir]` |
 | `do_simple` | `oc.v:128` | `restart`, `stop`, `start`, `shutdown` |
 | `do_logs` | `oc.v:141` | streaming logs with `-f` and optional `tail N` |
 | `is_int` | `oc.v:44` | validates numeric tail argument |
@@ -29,7 +29,7 @@
 ```bash
 oc status
 oc cwd
-oc cwd set <dir>
+oc cwd set [dir]
 oc restart [opencode|openchamber|all]
 oc stop    [opencode|openchamber|all]
 oc start   [opencode|openchamber|all]

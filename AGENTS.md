@@ -103,7 +103,7 @@ ocd --no-daemon
 # CLI usage
 oc status
 oc cwd
-oc cwd set /some/dir
+oc cwd set [/some/dir]
 oc restart [opencode|openchamber|all]
 oc stop    [opencode|openchamber|all]
 oc start   [opencode|openchamber|all]

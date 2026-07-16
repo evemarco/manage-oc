@@ -31,7 +31,7 @@ The daemon uses a JSON line protocol over `/run/ocd/ocd.sock`. The client sends 
 
 `manage-oc` was created to make it easier to run **openchamber behind a reverse proxy**. See the openchamber documentation for the recommended reverse-proxy setup: [https://docs.openchamber.dev/reverse-proxy/](https://docs.openchamber.dev/reverse-proxy/).
 
-Beyond process supervision, it solves a practical working-directory problem. You can run the `oc` client from **any terminal** — a real terminal on your machine, or the JavaScript terminal built into openchamber's web interface — to change the working directory of the supervised processes on the fly. This is especially useful because many plugins and LSP servers rely on the current working directory (`cwd`) to resolve project files, imports, or configuration. With `oc cwd set /path/to/project`, you can switch the daemon's working directory without restarting the whole stack, and the supervised processes will pick up the new `cwd` when they respawn.
+Beyond process supervision, it solves a practical working-directory problem. You can run the `oc` client from **any terminal** — a real terminal on your machine, or the JavaScript terminal built into openchamber's web interface — to change the working directory of the supervised processes on the fly. This is especially useful because many plugins and LSP servers rely on the current working directory (`cwd`) to resolve project files, imports, or configuration. With `oc cwd set /path/to/project` (or just `oc cwd set` to use the directory from which you run `oc`), you can switch the daemon's working directory without restarting the whole stack, and the supervised processes will pick up the new `cwd` when they respawn.
 
 ### Why openchamber?
 
@@ -120,7 +120,7 @@ Or send `SIGTERM` / `SIGINT` to the daemon process.
 ```bash
 oc status
 oc cwd
-oc cwd set /some/dir
+oc cwd set [/some/dir]
 oc cwd /some/dir
 oc start   [opencode|openchamber|all]
 oc stop    [opencode|openchamber|all]
@@ -142,6 +142,7 @@ Get or set the working directory used by the supervised processes:
 ```bash
 oc cwd
 oc cwd set /root/my-project
+oc cwd set              # use the current directory
 oc cwd /root/my-project
 ```
 
@@ -213,12 +214,14 @@ OPENCODE_PRINT_LOGS=true
 # openchamber variables
 OPENCHAMBER_HOST=127.0.0.1
 OPENCHAMBER_PORT=4097
-OPENCHAMBER_FOREGROUND=true
+OPENCHAMBER_UI_PASSWORD=your-secure-password
+OPENCODE_SKIP_START=true
 ```
 
 Notes:
 
-- `ocd` sets `OPENCODE_SKIP_START=false` for the `opencode` process automatically. You do not need to set it in this file.
+- `ocd` sets `OPENCODE_SKIP_START=true` for the `openchamber` process automatically so openchamber does not spawn its own `opencode`. You do not need to set it in this file.
+- To protect the OpenChamber web UI with a password, set `OPENCHAMBER_UI_PASSWORD` in this file or pass `--ui-password` when starting `openchamber`.
 - The actual variables understood by `opencode` and `openchamber` depend on their versions and CLI argument parsers. Use the binaries' `--help` output to discover the exact environment variables they support.
 - `ocd` already passes `--port`, `--hostname`, and `--print-logs` to `opencode`, and `--port`, `--host`, and `--foreground` to `openchamber` via CLI arguments. Some of these may be overridden by environment variables depending on how the binaries are implemented.
 
