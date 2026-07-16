@@ -5,6 +5,9 @@ procwd/procwd
 # OpenCode session state
 .omo/
 
+# Agent memory
+.agentmemory/
+
 # CodeGraph index / symlink
 .codegraph
 
