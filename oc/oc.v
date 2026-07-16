@@ -25,7 +25,7 @@ fn c_connect(path string) int {
 fn usage() {
 	eprintln('usage:')
 	eprintln('  oc status')
-	eprintln('  oc cwd [set <dir>] | <dir>')
+	eprintln('  oc cwd [set [dir]] | <dir>')
 	eprintln('  oc restart [opencode|openchamber|all]')
 	eprintln('  oc stop    [opencode|openchamber|all]')
 	eprintln('  oc start   [opencode|openchamber|all]')
@@ -107,10 +107,10 @@ fn do_cwd(rest []string) {
 	mut dir := ''
 	if rest[0] == 'set' {
 		if rest.len < 2 {
-			eprintln('oc: usage: oc cwd set <dir>')
-			exit(2)
+			dir = os.getwd()
+		} else {
+			dir = rest[1]
 		}
-		dir = rest[1]
 	} else {
 		dir = rest[0]
 	}
