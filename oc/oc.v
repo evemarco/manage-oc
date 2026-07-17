@@ -22,17 +22,27 @@ fn c_connect(path string) int {
 	return fd
 }
 
-fn usage() {
-	eprintln('usage:')
-	eprintln('  oc status')
-	eprintln('  oc cwd [set [dir]] | <dir>')
-	eprintln('  oc restart [opencode|openchamber|all]')
-	eprintln('  oc stop    [opencode|openchamber|all]')
-	eprintln('  oc start   [opencode|openchamber|all]')
-	eprintln('  oc reload')
-	eprintln('  oc logs    [opencode|openchamber] [-f] [tail N]')
-	eprintln('  oc version [opencode|openchamber|ocd|all]')
-	eprintln('  oc shutdown')
+fn usage(to_err bool) {
+	lines := [
+		'usage:',
+		'  oc status',
+		'  oc cwd [set [dir]] | <dir>',
+		'  oc restart [opencode|openchamber|all]',
+		'  oc stop    [opencode|openchamber|all]',
+		'  oc start   [opencode|openchamber|all]',
+		'  oc reload',
+		'  oc logs    [opencode|openchamber] [-f] [tail N]',
+		'  oc version [opencode|openchamber|ocd|all]',
+		'  oc shutdown',
+		'  oc help',
+	]
+	for line in lines {
+		if to_err {
+			eprintln(line)
+		} else {
+			println(line)
+		}
+	}
 }
 
 fn connect() int {
@@ -138,6 +148,10 @@ fn do_simple(op string, args []string) {
 		eprintln('oc: bad response: ' + resp)
 		exit(1)
 	}
+	if !ack.ok {
+		eprintln('oc: ' + ack.msg)
+		exit(1)
+	}
 	println(ack.msg)
 }
 
@@ -208,10 +222,11 @@ fn do_version(args []string) {
 		exit(1)
 	}
 	println('oc version : ' + vm.version)
-	println(ack.msg)
 	if !ack.ok {
+		eprintln('oc: ' + ack.msg)
 		exit(1)
 	}
+	println(ack.msg)
 }
 
 fn main() {
@@ -227,8 +242,10 @@ fn main() {
 		}
 	}
 	if args.len < 2 {
-		usage()
-		exit(2)
+		do_status()
+		println('')
+		println("Run 'oc help' for usage.")
+		return
 	}
 	sub := args[1]
 	match sub {
@@ -259,9 +276,12 @@ fn main() {
 		'shutdown' {
 			do_simple('shutdown', args)
 		}
+		'help', '--help', '-h' {
+			usage(false)
+		}
 		else {
 			eprintln('oc: unknown command: ' + sub)
-			usage()
+			usage(true)
 			exit(2)
 		}
 	}
