@@ -17,7 +17,7 @@ It consists of a Unix-socket daemon (`ocd`), a CLI client (`oc`), and a tiny `pr
 ├── build.sh           # compiles ocd & oc to /usr/local/bin
 ├── oc/
 │   ├── common.v       # same as root common.v
-│   └── oc.v           # CLI client: status | cwd | start | stop | restart | logs | shutdown
+│   └── oc.v           # CLI client: status | cwd | start | stop | restart | reload | logs | version | shutdown
 ├── ocd/
 │   ├── common.v       # same as root common.v
 │   ├── globals.h      # C globals shared with SIGTERM/SIGINT handler
@@ -32,11 +32,11 @@ It consists of a Unix-socket daemon (`ocd`), a CLI client (`oc`), and a tiny `pr
 | Task | Location | Notes |
 |------|----------|-------|
 | Build / install binaries | `build.sh` | `v -prod ocd/ -o /usr/local/bin/ocd` |
-| Daemon supervisor logic | `ocd/ocd.v` | spawn, restart, backoff, logging, signal handling |
-| CLI client commands | `oc/oc.v` | `main()` dispatch + `do_*` helpers |
+| Daemon supervisor logic | `ocd/ocd.v` | spawn, restart, backoff, logging, signal handling, process adoption, reload |
+| CLI client commands | `oc/oc.v` | `main()` dispatch + `do_*` helpers (including version, reload) |
 | Shared protocol structs | `common.v` / `oc/common.v` / `ocd/common.v` | `Command`, `StatusResp`, `AckResp`, socket helpers |
-| C globals for signal handler | `ocd/globals.h` | `g_ocd_pids`, `g_ocd_listen` |
-| Process cwd lookup | `procwd/procwd.v` | reads `/proc/<pid>/cwd` |
+| C globals for signal handler | `ocd/globals.h` | `g_ocd_pids`, `g_ocd_listen`, `g_ocd_reload`, `g_ocd_foreground` |
+| Process cwd / pid lookup | `procwd/procwd.v` | reads `/proc/<pid>/cwd` and scans `/proc` for process names |
 
 ## CODE MAP
 
@@ -49,6 +49,11 @@ It consists of a Unix-socket daemon (`ocd`), a CLI client (`oc`), and a tiny `pr
 | `App.tick` | fn | `ocd/ocd.v:365` | starts opencode, then openchamber when port ready |
 | `App.on_death` | fn | `ocd/ocd.v:387` | backoff, respawn, cascade stop openchamber |
 | `spawn_proc` | fn | `ocd/ocd.v:319` | creates `os.Process`, sets env/cwd/pgroup, starts `log_pump` goroutine |
+| `cmd_version` | fn | `ocd/ocd.v` | reports running and on-disk versions of supervised binaries |
+| `cmd_reload` | fn | `ocd/ocd.v` | re-reads `state.json` and configured env file, adjusts processes |
+| `adopt_existing_proc` | fn | `ocd/ocd.v` | adopts an already-running process on daemon startup |
+| `log_msg` | fn | `ocd/ocd.v` | writes to `daemon.log` and to stderr in foreground mode |
+| `find_pid_by_cmd` | fn | `ocd/ocd.v` | scans `/proc` to find a process matching a command name |
 | `handle_client` | fn | `ocd/ocd.v:642` | decodes JSON command, routes to `handle_req` |
 | `main` | fn | `oc/oc.v:193` | CLI argument dispatch (`status`, `cwd`, `restart`, etc.) |
 | `send_recv_one` | fn | `oc/oc.v:57` | connects to socket, sends JSON, returns one line |
@@ -100,6 +105,17 @@ ocd
 ocd --foreground
 ocd --no-daemon
 
+# Use a custom environment file
+ocd --config /path/to/env.conf
+ocd --env-file /path/to/env.conf
+
+# Reload a running daemon without restarting it
+ocd --reload
+
+# Show daemon version/help
+ocd --version
+ocd --help
+
 # CLI usage
 oc status
 oc cwd
@@ -107,7 +123,9 @@ oc cwd set [/some/dir]
 oc restart [opencode|openchamber|all]
 oc stop    [opencode|openchamber|all]
 oc start   [opencode|openchamber|all]
+oc reload
 oc logs    [opencode|openchamber] [-f] [tail N]
+oc version [opencode|openchamber|ocd|all]
 oc shutdown
 
 # Lookup cwd of a process
@@ -120,3 +138,6 @@ procwd <pid|name>
 - The `ocd` daemon writes to `/run/ocd`, which usually requires root or a prepared directory.
 - `procwd` is a standalone helper; it does not talk to the daemon and is not built by `build.sh`.
 - The codegraph index in this workspace spans multiple projects, so `codegraph_*` queries may return unrelated symbols; prefer direct file reads for this repo.
+- `ocd --config` and `ocd --env-file` override the default `/etc/opencode-web.conf` path; `oc reload` re-reads the configured file on a running daemon.
+- `ocd` can adopt already-running `opencode` / `openchamber` processes on startup, provided their `cmdline` contains the expected `--port` argument.
+- `oc version` handles interpreter-launched binaries (e.g. `openchamber` under Node) and reports both the application version and the interpreter version.

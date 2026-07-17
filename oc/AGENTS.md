@@ -7,15 +7,16 @@
 
 | Symbol | Location | Role |
 |--------|----------|------|
-| `main` | `oc.v:193` | dispatches subcommands |
-| `c_connect` | `oc.v:6` | creates AF_UNIX client socket |
-| `connect` | `oc.v:35` | wraps `c_connect`; exits if socket missing |
-| `send_recv_one` | `oc.v:57` | sends one JSON command and reads one response |
-| `do_status` | `oc.v:72` | pretty-prints daemon status table |
-| `do_cwd` | `oc.v:96` | `oc cwd` and `oc cwd set [dir]` |
-| `do_simple` | `oc.v:128` | `restart`, `stop`, `start`, `shutdown` |
-| `do_logs` | `oc.v:141` | streaming logs with `-f` and optional `tail N` |
-| `is_int` | `oc.v:44` | validates numeric tail argument |
+| `main` | `oc.v` | dispatches subcommands |
+| `c_connect` | `oc.v` | creates AF_UNIX client socket |
+| `connect` | `oc.v` | wraps `c_connect`; exits if socket missing |
+| `send_recv_one` | `oc.v` | sends one JSON command and reads one response |
+| `do_status` | `oc.v` | pretty-prints daemon status table |
+| `do_cwd` | `oc.v` | `oc cwd` and `oc cwd set [dir]` |
+| `do_simple` | `oc.v` | `restart`, `stop`, `start`, `reload`, `shutdown` |
+| `do_logs` | `oc.v` | streaming logs with `-f` and optional `tail N` |
+| `do_version` | `oc.v` | `oc version` and `oc version <target>` |
+| `is_int` | `oc.v` | validates numeric tail argument |
 | `Command`/`StatusResp`/`AckResp` | `common.v` | shared protocol structs |
 
 ## UNIQUE STYLES
@@ -33,7 +34,9 @@ oc cwd set [dir]
 oc restart [opencode|openchamber|all]
 oc stop    [opencode|openchamber|all]
 oc start   [opencode|openchamber|all]
+oc reload
 oc logs    [opencode|openchamber] [-f] [tail N]
+oc version [opencode|openchamber|ocd|all]
 oc shutdown
 ```
 

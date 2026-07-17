@@ -29,7 +29,9 @@ fn usage() {
 	eprintln('  oc restart [opencode|openchamber|all]')
 	eprintln('  oc stop    [opencode|openchamber|all]')
 	eprintln('  oc start   [opencode|openchamber|all]')
+	eprintln('  oc reload')
 	eprintln('  oc logs    [opencode|openchamber] [-f] [tail N]')
+	eprintln('  oc version [opencode|openchamber|ocd|all]')
 	eprintln('  oc shutdown')
 }
 
@@ -191,6 +193,27 @@ fn do_logs(rest []string) {
 	}
 }
 
+fn do_version(args []string) {
+	vm := vmod.decode(@VMOD_FILE) or {
+		eprintln('oc: cannot read v.mod: ' + err.msg())
+		exit(1)
+	}
+	mut target := ''
+	if args.len > 2 {
+		target = args[2]
+	}
+	resp := send_recv_one(Command{ op: 'version', target: target })
+	ack := json.decode(AckResp, resp) or {
+		eprintln('oc: bad response: ' + resp)
+		exit(1)
+	}
+	println('oc version : ' + vm.version)
+	println(ack.msg)
+	if !ack.ok {
+		exit(1)
+	}
+}
+
 fn main() {
 	args := os.args
 	for a in args {
@@ -226,6 +249,12 @@ fn main() {
 		}
 		'logs' {
 			do_logs(args[2..])
+		}
+		'reload' {
+			do_simple('reload', args)
+		}
+		'version' {
+			do_version(args)
 		}
 		'shutdown' {
 			do_simple('shutdown', args)

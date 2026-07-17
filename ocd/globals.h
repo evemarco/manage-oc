@@ -5,8 +5,14 @@
 #define OCD_GLOBALS_H
 static int g_ocd_pids[2] = { 0, 0 }; // [0] = opencode pid, [1] = openchamber pid
 static int g_ocd_listen = -1;        // control socket listen fd
+static volatile int g_ocd_reload = 0; // SIGHUP flag
+static volatile int g_ocd_foreground = 0; // foreground mode flag
 static inline int ocd_get_listen() { return g_ocd_listen; }
 static inline void ocd_set_listen(int v) { g_ocd_listen = v; }
 static inline int ocd_get_pid(int i) { return g_ocd_pids[i]; }
 static inline void ocd_set_pid(int i, int v) { g_ocd_pids[i] = v; }
+static inline int ocd_get_reload() { return g_ocd_reload; }
+static inline void ocd_set_reload(int v) { g_ocd_reload = v; }
+static inline int ocd_get_foreground() { return g_ocd_foreground; }
+static inline void ocd_set_foreground(int v) { g_ocd_foreground = v; }
 #endif

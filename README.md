@@ -96,6 +96,27 @@ Set the initial working directory on startup:
 ocd --cwd /some/path
 ```
 
+Use a custom environment file instead of `/etc/opencode-web.conf`:
+
+```bash
+ocd --config /path/to/env.conf
+# or
+ocd --env-file /path/to/env.conf
+```
+
+Reload a running daemon's configuration without restarting it:
+
+```bash
+ocd --reload
+```
+
+Show daemon version or help:
+
+```bash
+ocd --version
+ocd --help
+```
+
 ### Stop the daemon
 
 ```bash
@@ -125,9 +146,13 @@ oc cwd /some/dir
 oc start   [opencode|openchamber|all]
 oc stop    [opencode|openchamber|all]
 oc restart [opencode|openchamber|all]
+oc reload
 oc logs    [opencode|openchamber] [-f] [tail N]
+oc version [opencode|openchamber|ocd|all]
 oc shutdown
 ```
+
+Use `oc version` to check the versions of `oc`, `ocd`, and the running supervised processes. It also warns when a running binary no longer matches the on-disk executable (for example after an update).
 
 ### Examples
 
@@ -171,6 +196,20 @@ oc logs opencode 100
 oc logs opencode tail 100
 ```
 
+Reload the daemon's configuration and state without restarting it:
+
+```bash
+oc reload
+```
+
+Check versions of the client, daemon, and supervised processes:
+
+```bash
+oc version
+oc version opencode
+oc version openchamber
+```
+
 ## The `procwd` helper
 
 `procwd` is a standalone utility that prints the current working directory of a process by PID or by process name.
@@ -185,7 +224,7 @@ It scans `/proc` for a matching PID or `comm`/`cmdline` and prints `pid: cwd` li
 
 ## Configuration
 
-The daemon reads a simple key-value file at `/etc/opencode-web.conf` and injects its variables into the environment of the spawned processes. The file is optional; if it is missing, no extra environment variables are added.
+The daemon reads a simple key-value file and injects its variables into the environment of the spawned processes. By default the file is `/etc/opencode-web.conf`; you can override it with `ocd --config <path>` or `ocd --env-file <path>`. The file is optional; if it is missing, no extra environment variables are added. `oc reload` re-reads the configured file on a running daemon.
 
 ```text
 # /etc/opencode-web.conf
@@ -246,7 +285,6 @@ ocd --foreground
 # or
 ocd --no-daemon
 ```
-```
 
 ## Project notes
 
@@ -254,7 +292,9 @@ ocd --no-daemon
 - The root `common.v` is **not** used by the builds; `oc/` and `ocd/` compile only their own directory contents.
 - Unix socket operations are done with inline C bindings (`fn C.*`) because V does not have a native `AF_UNIX` API.
 - The daemon uses C globals in `ocd/globals.h` so that the `SIGTERM`/`SIGINT` handler can cleanly kill the supervised process groups and remove the socket/pidfile.
-- All runtime paths (`/run/ocd`, `/etc/opencode-web.conf`, the binary paths) are hardcoded and Linux-specific.
+- `ocd` can adopt already-running `opencode` / `openchamber` processes on startup, which lets you restart or upgrade the daemon without killing the supervised processes.
+- `oc version` detects interpreter-launched binaries (e.g. `openchamber` running under Node) and reports both the application version and the interpreter version.
+- All runtime paths (`/run/ocd`, `/etc/opencode-web.conf`, the binary paths) are hardcoded and Linux-specific. The configuration file path can be overridden with `ocd --config`.
 
 ## License
 
