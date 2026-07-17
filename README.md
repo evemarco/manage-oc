@@ -121,9 +121,11 @@ ocd --help
 
 ```bash
 oc shutdown
+# or, without the client:
+ocd --shutdown
 ```
 
-Or send `SIGTERM` / `SIGINT` to the daemon process.
+Both stop the supervised processes and the daemon itself. You can also send `SIGTERM` / `SIGINT` to the daemon process.
 
 ### Runtime files
 

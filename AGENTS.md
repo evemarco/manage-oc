@@ -114,6 +114,9 @@ ocd --env-file /path/to/env.conf
 # Reload a running daemon without restarting it
 ocd --reload
 
+# Stop the running daemon completely (supervised processes included)
+ocd --shutdown
+
 # Show daemon version/help
 ocd --version
 ocd --help

@@ -8,7 +8,7 @@ Daemon-specific code for `ocd`, the Unix-socket supervisor that manages opencode
 
 | Symbol | Location | Role |
 |--------|----------|------|
-| `main` | `ocd.v` | Forks via `daemonize` unless `--foreground`/`--no-daemon` is passed. Handles `--version`, `--help`, `--reload`. |
+| `main` | `ocd.v` | Forks via `daemonize` unless `--foreground`/`--no-daemon` is passed. Handles `--version`, `--help`, `--reload`, `--shutdown`. |
 | `run_daemon` | `ocd.v` | pidfile, socket bind, signal setup, `App.run()`. Parses `--cwd`, `--config`. |
 | `App` | `ocd.v` | Supervisor state: process slots, channels, listen fd, tick timer, conf path. |
 | `App.run` | `ocd.v` | `select` loop on `req_ch`, `death_ch`, and `tick_ch`. |
@@ -66,6 +66,9 @@ ocd --env-file /path/to/env.conf
 
 # Reload a running daemon without restarting it
 ocd --reload
+
+# Stop the running daemon completely (supervised processes included)
+ocd --shutdown
 
 # Show daemon version/help
 ocd --version
