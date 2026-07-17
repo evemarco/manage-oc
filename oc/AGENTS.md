@@ -16,6 +16,7 @@
 | `do_simple` | `oc.v` | `restart`, `stop`, `start`, `reload`, `shutdown` |
 | `do_logs` | `oc.v` | streaming logs with `-f` and optional `tail N` |
 | `do_version` | `oc.v` | `oc version` and `oc version <target>` |
+| `usage` | `oc.v` | prints usage to stdout (`false`) or stderr (`true`) |
 | `is_int` | `oc.v` | validates numeric tail argument |
 | `Command`/`StatusResp`/`AckResp` | `common.v` | shared protocol structs |
 
@@ -28,6 +29,7 @@
 ## COMMANDS
 
 ```bash
+oc                   # bare oc = oc status + hint to run 'oc help'
 oc status
 oc cwd
 oc cwd set [dir]
@@ -38,9 +40,11 @@ oc reload
 oc logs    [opencode|openchamber] [-f] [tail N]
 oc version [opencode|openchamber|ocd|all]
 oc shutdown
+oc help              # usage on stdout (also: --help, -h)
 ```
 
 ## NOTES
 - `do_logs` uses `__END__` as a sentinel for non-follow mode; do not remove it.
 - `oc/common.v` is a symlink to the root `common.v`, not a module; changes only need to be made in the root file.
 - Unknown commands and usage errors exit with code 2; daemon or protocol errors exit with code 1.
+- stdout/stderr convention: results go to stdout, errors to stderr. `usage(false)` prints to stdout (`oc help`), `usage(true)` prints to stderr (after an unknown command). Keep `!ack.ok` checks printing via `eprintln` with `exit(1)`.

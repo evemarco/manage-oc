@@ -14,16 +14,17 @@ It consists of a Unix-socket daemon (`ocd`), a CLI client (`oc`), and a tiny `pr
 ```
 .
 ├── common.v           # shared socket/protocol definitions (symlinked from oc/, ocd/)
-├── build.sh           # compiles ocd & oc to /usr/local/bin
+├── build.sh           # compiles ocd, oc & procwd to /usr/local/bin
 ├── oc/
+│   ├── AGENTS.md      # CLI client knowledge base
 │   ├── common.v       # same as root common.v
-│   └── oc.v           # CLI client: status | cwd | start | stop | restart | reload | logs | version | shutdown
+│   └── oc.v           # CLI client: status | cwd | start | stop | restart | reload | logs | version | shutdown | help
 ├── ocd/
+│   ├── AGENTS.md      # daemon knowledge base
 │   ├── common.v       # same as root common.v
 │   ├── globals.h      # C globals shared with SIGTERM/SIGINT handler
 │   └── ocd.v          # daemon + supervisor loop
 └── procwd/
-    ├── procwd         # compiled binary
     └── procwd.v       # utility: print cwd of process by pid or name
 ```
 
@@ -31,7 +32,7 @@ It consists of a Unix-socket daemon (`ocd`), a CLI client (`oc`), and a tiny `pr
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Build / install binaries | `build.sh` | `v -prod ocd/ -o /usr/local/bin/ocd` |
+| Build / install binaries | `build.sh` | builds `ocd`, `oc` and `procwd` into `/usr/local/bin` |
 | Daemon supervisor logic | `ocd/ocd.v` | spawn, restart, backoff, logging, signal handling, process adoption, reload |
 | CLI client commands | `oc/oc.v` | `main()` dispatch + `do_*` helpers (including version, reload) |
 | Shared protocol structs | `common.v` / `oc/common.v` / `ocd/common.v` | `Command`, `StatusResp`, `AckResp`, socket helpers |
@@ -55,7 +56,7 @@ It consists of a Unix-socket daemon (`ocd`), a CLI client (`oc`), and a tiny `pr
 | `log_msg` | fn | `ocd/ocd.v` | writes to `daemon.log` and to stderr in foreground mode |
 | `find_pid_by_cmd` | fn | `ocd/ocd.v` | scans `/proc` to find a process matching a command name |
 | `handle_client` | fn | `ocd/ocd.v:642` | decodes JSON command, routes to `handle_req` |
-| `main` | fn | `oc/oc.v:193` | CLI argument dispatch (`status`, `cwd`, `restart`, etc.) |
+| `main` | fn | `oc/oc.v:232` | CLI argument dispatch (`status`, `cwd`, `restart`, etc.) |
 | `send_recv_one` | fn | `oc/oc.v:57` | connects to socket, sends JSON, returns one line |
 | `c_connect` | fn | `oc/oc.v:6` | AF_UNIX client socket setup |
 | `c_listen` | fn | `ocd/ocd.v:177` | AF_UNIX server socket setup + bind/listen |
@@ -117,6 +118,7 @@ ocd --version
 ocd --help
 
 # CLI usage
+oc                   # bare oc = oc status + hint to run 'oc help'
 oc status
 oc cwd
 oc cwd set [/some/dir]
@@ -127,16 +129,18 @@ oc reload
 oc logs    [opencode|openchamber] [-f] [tail N]
 oc version [opencode|openchamber|ocd|all]
 oc shutdown
+oc help              # usage on stdout (also: --help, -h)
 
 # Lookup cwd of a process
-procwd <pid|name>
+procwd <pid|name> [pid|name...]
+procwd --version
 ```
 
 ## NOTES
 
 - `common.v` is **not** a shared V module; it is reused via symlinks from `oc/` and `ocd/`. Consider extracting a real V module if the project grows.
 - The `ocd` daemon writes to `/run/ocd`, which usually requires root or a prepared directory.
-- `procwd` is a standalone helper; it does not talk to the daemon and is not built by `build.sh`.
+- `procwd` is a standalone helper; it does not talk to the daemon but is built by `build.sh` like the other binaries.
 - The codegraph index in this workspace spans multiple projects, so `codegraph_*` queries may return unrelated symbols; prefer direct file reads for this repo.
 - `ocd --config` and `ocd --env-file` override the default `/etc/opencode-web.conf` path; `oc reload` re-reads the configured file on a running daemon.
 - `ocd` can adopt already-running `opencode` / `openchamber` processes on startup, provided their `cmdline` contains the expected `--port` argument.

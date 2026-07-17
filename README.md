@@ -139,6 +139,7 @@ Or send `SIGTERM` / `SIGINT` to the daemon process.
 ## The `oc` client
 
 ```bash
+oc                   # same as 'oc status', plus a hint about 'oc help'
 oc status
 oc cwd
 oc cwd set [/some/dir]
@@ -150,7 +151,10 @@ oc reload
 oc logs    [opencode|openchamber] [-f] [tail N]
 oc version [opencode|openchamber|ocd|all]
 oc shutdown
+oc help              # show usage (also: --help, -h)
 ```
+
+Results are printed to stdout; errors go to stderr. Exit codes: `0` on success, `1` for daemon or protocol errors (including unknown targets), `2` for unknown commands.
 
 Use `oc version` to check the versions of `oc`, `ocd`, and the running supervised processes. It also warns when a running binary no longer matches the on-disk executable (for example after an update).
 
