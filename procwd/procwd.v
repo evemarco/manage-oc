@@ -62,7 +62,7 @@ fn main() {
 		print_version()
 	}
 	if os.args.len < 2 {
-		eprintln('usage: procd <pid|name> [pid|name...]')
+		eprintln('usage: procwd <pid|name> [pid|name...]')
 		exit(2)
 	}
 	mut any_error := false
