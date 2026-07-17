@@ -327,6 +327,32 @@ fn do_reload() {
 	exit(0)
 }
 
+fn has_shutdown_flag(args []string) bool {
+	for a in args {
+		if a == '--shutdown' {
+			return true
+		}
+	}
+	return false
+}
+
+fn do_shutdown() {
+	if !os.exists(pid_path) {
+		eprintln('ocd: not running (no pid file)')
+		exit(1)
+	}
+	raw := os.read_file(pid_path) or { '' }
+	pid := raw.trim_space().int()
+	// SIGTERM: the daemon's on_term handler kills the supervised process
+	// groups, closes the listen socket and removes the socket + pid files.
+	if pid <= 0 || C.kill(pid, 15) != 0 {
+		eprintln('ocd: cannot signal daemon (pid ${pid})')
+		exit(1)
+	}
+	println('ocd: shutdown signaled to daemon pid ${pid}')
+	exit(0)
+}
+
 fn backoff_for(n int) int {
 	return match n {
 		1 { 1 }
@@ -1113,6 +1139,7 @@ fn usage() {
 	eprintln('  ocd [--foreground|--no-daemon] [--cwd <dir>] [--config <path>]')
 	eprintln('  ocd --daemon')
 	eprintln('  ocd --reload')
+	eprintln('  ocd --shutdown')
 	eprintln('  ocd --version')
 	eprintln('  ocd --help')
 }
@@ -1135,6 +1162,10 @@ fn main() {
 	}
 	if has_reload_flag(args) {
 		do_reload()
+		return
+	}
+	if has_shutdown_flag(args) {
+		do_shutdown()
 		return
 	}
 	if has_foreground_flag(args) {
