@@ -16,6 +16,7 @@
 | `do_simple` | `oc.v` | `restart`, `stop`, `start`, `reload`, `shutdown` |
 | `do_logs` | `oc.v` | streaming logs with `-f` and optional `tail N` |
 | `do_version` | `oc.v` | `oc version` and `oc version <target>` |
+| `print_latest`/`fetch_latest` | `oc.v` | fetches online latest versions in parallel (GitHub releases / npm), silent on failure |
 | `usage` | `oc.v` | prints usage to stdout (`false`) or stderr (`true`) |
 | `is_int` | `oc.v` | validates numeric tail argument |
 | `Command`/`StatusResp`/`AckResp` | `common.v` | shared protocol structs |
@@ -48,3 +49,4 @@ oc help              # usage on stdout (also: --help, -h)
 - `oc/common.v` is a symlink to the root `common.v`, not a module; changes only need to be made in the root file.
 - Unknown commands and usage errors exit with code 2; daemon or protocol errors exit with code 1.
 - stdout/stderr convention: results go to stdout, errors to stderr. `usage(false)` prints to stdout (`oc help`), `usage(true)` prints to stderr (after an unknown command). Keep `!ack.ok` checks printing via `eprintln` with `exit(1)`.
+- Online version checks live in the client, never in `ocd` (its `select` loop must not block on network). Sources: GitHub releases for opencode (`anomalyco/opencode`) and manage-oc (`evemarco/manage-oc`), npm registry for openchamber (`@openchamber/web`). 2s read timeout, parallel goroutines, silent on any failure.

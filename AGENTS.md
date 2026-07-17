@@ -57,6 +57,7 @@ It consists of a Unix-socket daemon (`ocd`), a CLI client (`oc`), and a tiny `pr
 | `find_pid_by_cmd` | fn | `ocd/ocd.v` | scans `/proc` to find a process matching a command name |
 | `handle_client` | fn | `ocd/ocd.v:642` | decodes JSON command, routes to `handle_req` |
 | `main` | fn | `oc/oc.v:232` | CLI argument dispatch (`status`, `cwd`, `restart`, etc.) |
+| `print_latest` | fn | `oc/oc.v` | fetches latest online versions (GitHub releases / npm) in parallel; silent when offline |
 | `send_recv_one` | fn | `oc/oc.v:57` | connects to socket, sends JSON, returns one line |
 | `c_connect` | fn | `oc/oc.v:6` | AF_UNIX client socket setup |
 | `c_listen` | fn | `ocd/ocd.v:177` | AF_UNIX server socket setup + bind/listen |

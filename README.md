@@ -158,6 +158,8 @@ Results are printed to stdout; errors go to stderr. Exit codes: `0` on success, 
 
 Use `oc version` to check the versions of `oc`, `ocd`, and the running supervised processes. It also warns when a running binary no longer matches the on-disk executable (for example after an update).
 
+When the machine has internet access, `oc version` also queries the latest published versions — opencode (GitHub releases), openchamber (npm `@openchamber/web`), and manage-oc itself (GitHub releases) — and prints them in a `latest (online)` section so you can see at a glance whether an update is available. When offline, this section is silently omitted.
+
 ### Examples
 
 Show daemon status:
