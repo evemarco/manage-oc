@@ -27,16 +27,16 @@ fn c_connect(path string) int {
 fn usage(to_err bool) {
 	lines := [
 		'usage:',
-		'  oc status',
-		'  oc cwd [set [dir]] | <dir>',
-		'  oc restart [opencode|openchamber|all]',
-		'  oc stop    [opencode|openchamber|all]',
-		'  oc start   [opencode|openchamber|all]',
-		'  oc reload',
-		'  oc logs    [opencode|openchamber] [-f] [tail N]',
-		'  oc version [opencode|openchamber|ocd|all]',
-		'  oc shutdown',
-		'  oc help',
+		'  ocw status',
+		'  ocw cwd [set [dir]] | <dir>',
+		'  ocw restart [opencode|openchamber|all]',
+		'  ocw stop    [opencode|openchamber|all]',
+		'  ocw start   [opencode|openchamber|all]',
+		'  ocw reload',
+		'  ocw logs    [opencode|openchamber] [-f] [tail N]',
+		'  ocw version [opencode|openchamber|ocwd|all]',
+		'  ocw shutdown',
+		'  ocw help',
 	]
 	for line in lines {
 		if to_err {
@@ -50,7 +50,7 @@ fn usage(to_err bool) {
 fn connect() int {
 	fd := c_connect(sock_path)
 	if fd < 0 {
-		eprintln('oc: ocd not started (no socket at ' + sock_path + ')')
+		eprintln('ocw: ocwd not started (no socket at ' + sock_path + ')')
 		exit(1)
 	}
 	return fd
@@ -87,7 +87,7 @@ fn pad(s string, n int) string {
 fn do_status() {
 	resp := send_recv_one(Command{ op: 'status' })
 	st := json.decode(StatusResp, resp) or {
-		eprintln('oc: bad response: ' + resp)
+		eprintln('ocw: bad response: ' + resp)
 		exit(1)
 	}
 	println('Daemon pid : ' + st.daemon_pid.str())
@@ -112,7 +112,7 @@ fn do_cwd(rest []string) {
 	if rest.len == 0 {
 		resp := send_recv_one(Command{ op: 'cwd', arg: 'get' })
 		ack := json.decode(AckResp, resp) or {
-			eprintln('oc: bad response: ' + resp)
+			eprintln('ocw: bad response: ' + resp)
 			exit(1)
 		}
 		println('cwd: ' + ack.msg)
@@ -130,11 +130,11 @@ fn do_cwd(rest []string) {
 	}
 	resp := send_recv_one(Command{ op: 'cwd', arg: 'set', target: dir })
 	ack := json.decode(AckResp, resp) or {
-		eprintln('oc: bad response: ' + resp)
+		eprintln('ocw: bad response: ' + resp)
 		exit(1)
 	}
 	if !ack.ok {
-		eprintln('oc: ' + ack.msg)
+		eprintln('ocw: ' + ack.msg)
 		exit(1)
 	}
 	println(ack.msg)
@@ -147,11 +147,11 @@ fn do_simple(op string, args []string) {
 	}
 	resp := send_recv_one(Command{ op: op, target: target })
 	ack := json.decode(AckResp, resp) or {
-		eprintln('oc: bad response: ' + resp)
+		eprintln('ocw: bad response: ' + resp)
 		exit(1)
 	}
 	if !ack.ok {
-		eprintln('oc: ' + ack.msg)
+		eprintln('ocw: ' + ack.msg)
 		exit(1)
 	}
 	println(ack.msg)
@@ -211,7 +211,7 @@ fn do_logs(rest []string) {
 
 fn do_version(args []string) {
 	vm := vmod.decode(@VMOD_FILE) or {
-		eprintln('oc: cannot read v.mod: ' + err.msg())
+		eprintln('ocw: cannot read v.mod: ' + err.msg())
 		exit(1)
 	}
 	mut target := ''
@@ -220,12 +220,12 @@ fn do_version(args []string) {
 	}
 	resp := send_recv_one(Command{ op: 'version', target: target })
 	ack := json.decode(AckResp, resp) or {
-		eprintln('oc: bad response: ' + resp)
+		eprintln('ocw: bad response: ' + resp)
 		exit(1)
 	}
-	println('oc version : ' + vm.version)
+	println('ocw version : ' + vm.version)
 	if !ack.ok {
-		eprintln('oc: ' + ack.msg)
+		eprintln('ocw: ' + ack.msg)
 		exit(1)
 	}
 	println(ack.msg)
@@ -267,7 +267,7 @@ fn latest_reqs(target string) []LatestReq {
 	return match target {
 		'opencode' { [opencode] }
 		'openchamber' { [openchamber] }
-		'ocd' { [manage_oc] }
+		'ocwd' { [manage_oc] }
 		else { [opencode, openchamber, manage_oc] }
 	}
 }
@@ -277,7 +277,7 @@ fn fetch_latest(req LatestReq) string {
 	resp := http.fetch(http.FetchConfig{
 		url:          req.url
 		read_timeout: 2 * time.second
-		header:       http.new_header(key: .user_agent, value: 'oc-version-check')
+		header:       http.new_header(key: .user_agent, value: 'ocw-version-check')
 	}) or { return '' }
 	if resp.status_code != 200 {
 		return ''
@@ -328,17 +328,17 @@ fn main() {
 	for a in args {
 		if a == '--version' {
 			vm := vmod.decode(@VMOD_FILE) or {
-				eprintln('oc: cannot read v.mod: ' + err.msg())
+				eprintln('ocw: cannot read v.mod: ' + err.msg())
 				exit(1)
 			}
-			println('oc ' + vm.version)
+			println('ocw ' + vm.version)
 			exit(0)
 		}
 	}
 	if args.len < 2 {
 		do_status()
 		println('')
-		println("Run 'oc help' for usage.")
+		println("Run 'ocw help' for usage.")
 		return
 	}
 	sub := args[1]
@@ -374,7 +374,7 @@ fn main() {
 			usage(false)
 		}
 		else {
-			eprintln('oc: unknown command: ' + sub)
+			eprintln('ocw: unknown command: ' + sub)
 			usage(true)
 			exit(2)
 		}
