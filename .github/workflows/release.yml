@@ -24,8 +24,8 @@ jobs:
       - name: Build binaries
         run: |
           mkdir -p dist/manage-oc-linux-x64
-          v -prod ocd/ -o dist/manage-oc-linux-x64/ocd
-          v -prod oc/ -o dist/manage-oc-linux-x64/oc
+          v -prod ocwd/ -o dist/manage-oc-linux-x64/ocwd
+          v -prod ocw/ -o dist/manage-oc-linux-x64/ocw
           v -prod procwd/ -o dist/manage-oc-linux-x64/procwd
 
       - name: Package binaries
