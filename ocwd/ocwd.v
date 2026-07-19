@@ -9,29 +9,31 @@ import v.vmod
 #include "globals.h"
 
 // C-side accessors for the globals shared with the signal handler.
-fn C.ocd_get_listen() int
-fn C.ocd_set_listen(int)
-fn C.ocd_get_pid(int) int
-fn C.ocd_set_pid(int, int)
-fn C.ocd_get_reload() int
-fn C.ocd_set_reload(int)
-fn C.ocd_get_foreground() int
-fn C.ocd_set_foreground(int)
+fn C.ocwd_get_listen() int
+fn C.ocwd_set_listen(int)
+fn C.ocwd_get_pid(int) int
+fn C.ocwd_set_pid(int, int)
+fn C.ocwd_get_reload() int
+fn C.ocwd_set_reload(int)
+fn C.ocwd_get_foreground() int
+fn C.ocwd_set_foreground(int)
 
 // ---- daemon runtime paths / constants ----
 const o_rdwr = 2
 const o_wronly = 1
 const o_creat = 64
 const o_append = 1024
-const daemon_log = '/run/ocd/daemon.log'
-const runtime_dir = '/run/ocd'
-const pid_path = '/run/ocd/ocd.pid'
-const state_path = '/run/ocd/state.json'
-const logs_dir = '/run/ocd/logs'
+const daemon_log = '/run/ocwd/daemon.log'
+const runtime_dir = '/run/ocwd'
+const pid_path = '/run/ocwd/ocwd.pid'
+const state_path = '/run/ocwd/state.json'
+const logs_dir = '/run/ocwd/logs'
+const legacy_pid_path = '/run/ocd/ocd.pid'
+const legacy_state_path = '/run/ocd/state.json'
 const default_conf_path = '/etc/opencode-web.conf'
 const opencode_bin = '/root/.opencode/bin/opencode'
 const openchamber_bin = '/root/.local/share/pnpm/bin/openchamber'
-const oc_host = '127.0.0.1'
+const service_host = '127.0.0.1'
 const opencode_port = 4096
 const openchamber_port = 4097
 
@@ -40,6 +42,31 @@ fn pid_alive(pid int) bool {
 		return false
 	}
 	return C.kill(pid, 0) == 0
+}
+
+fn ensure_legacy_daemon_stopped() {
+	if !os.exists(legacy_pid_path) {
+		return
+	}
+	raw := os.read_file(legacy_pid_path) or { return }
+	pid := raw.trim_space().int()
+	name := (os.read_file('/proc/${pid}/comm') or { '' }).trim_space()
+	if pid_alive(pid) && name == 'ocd' {
+		eprintln('ocwd: legacy ocd daemon is still running (pid ${pid}); stop it before starting ocwd')
+		exit(1)
+	}
+}
+
+fn migrate_legacy_state() {
+	if os.exists(state_path) || !os.exists(legacy_state_path) {
+		return
+	}
+	raw := os.read_file(legacy_state_path) or { return }
+	os.write_file(state_path, raw) or {
+		eprintln('ocwd: cannot migrate legacy state: ' + err.msg())
+		return
+	}
+	log_msg('ocwd: migrated state from ${legacy_state_path}')
 }
 
 // ---- conf / env / state ----
@@ -82,14 +109,14 @@ struct ProcState {
 	enabled bool = true
 }
 
-struct OcdState {
+struct OcwdState {
 mut:
 	cwd   string
 	procs map[string]ProcState
 }
 
-fn default_state() OcdState {
-	return OcdState{
+fn default_state() OcwdState {
+	return OcwdState{
 		cwd:   '/root'
 		procs: {
 			'opencode':    ProcState{
@@ -102,13 +129,13 @@ fn default_state() OcdState {
 	}
 }
 
-fn load_state() OcdState {
+fn load_state() OcwdState {
 	mut st := default_state()
 	if !os.exists(state_path) {
 		return st
 	}
 	raw := os.read_file(state_path) or { return st }
-	mut decoded := json.decode(OcdState, raw) or { return st }
+	mut decoded := json.decode(OcwdState, raw) or { return st }
 	if decoded.cwd.len == 0 {
 		decoded.cwd = '/root'
 	}
@@ -125,9 +152,9 @@ fn load_state() OcdState {
 	return decoded
 }
 
-fn save_state(st OcdState) {
+fn save_state(st OcwdState) {
 	os.write_file(state_path, json.encode(st)) or {
-		eprintln('ocd: cannot save state: ' + err.msg())
+		eprintln('ocwd: cannot save state: ' + err.msg())
 	}
 }
 
@@ -229,7 +256,7 @@ fn redirect_std_to_devnull(foreground bool) {
 
 // log_msg writes to daemon.log and, in foreground mode, also prints to stderr.
 fn log_msg(msg string) {
-	if C.ocd_get_foreground() == 1 {
+	if C.ocwd_get_foreground() == 1 {
 		eprintln(msg)
 	}
 	mut f := os.open_append(daemon_log) or { return }
@@ -240,19 +267,19 @@ fn log_msg(msg string) {
 @[heap]
 struct Proc {
 mut:
-	name       string
-	cmd        string
-	args       []string
-	is_oc      bool
-	enabled    bool
-	p          &os.Process
-	have_proc  bool
-	alive      bool
-	started_at i64
-	restarts   int
-	backoff    int
-	next_start i64
-	logpath    string
+	name        string
+	cmd         string
+	args        []string
+	is_opencode bool
+	enabled     bool
+	p           &os.Process
+	have_proc   bool
+	alive       bool
+	started_at  i64
+	restarts    int
+	backoff     int
+	next_start  i64
+	logpath     string
 }
 
 struct Req {
@@ -314,16 +341,16 @@ fn has_reload_flag(args []string) bool {
 
 fn do_reload() {
 	if !os.exists(pid_path) {
-		eprintln('ocd: not running (no pid file)')
+		eprintln('ocwd: not running (no pid file)')
 		exit(1)
 	}
 	raw := os.read_file(pid_path) or { '' }
 	pid := raw.trim_space().int()
 	if pid <= 0 || C.kill(pid, 1) != 0 {
-		eprintln('ocd: cannot signal daemon (pid ${pid})')
+		eprintln('ocwd: cannot signal daemon (pid ${pid})')
 		exit(1)
 	}
-	println('ocd: reload signaled to daemon pid ${pid}')
+	println('ocwd: reload signaled to daemon pid ${pid}')
 	exit(0)
 }
 
@@ -338,7 +365,7 @@ fn has_shutdown_flag(args []string) bool {
 
 fn do_shutdown() {
 	if !os.exists(pid_path) {
-		eprintln('ocd: not running (no pid file)')
+		eprintln('ocwd: not running (no pid file)')
 		exit(1)
 	}
 	raw := os.read_file(pid_path) or { '' }
@@ -346,10 +373,10 @@ fn do_shutdown() {
 	// SIGTERM: the daemon's on_term handler kills the supervised process
 	// groups, closes the listen socket and removes the socket + pid files.
 	if pid <= 0 || C.kill(pid, 15) != 0 {
-		eprintln('ocd: cannot signal daemon (pid ${pid})')
+		eprintln('ocwd: cannot signal daemon (pid ${pid})')
 		exit(1)
 	}
-	println('ocd: shutdown signaled to daemon pid ${pid}')
+	println('ocwd: shutdown signaled to daemon pid ${pid}')
 	exit(0)
 }
 
@@ -378,19 +405,19 @@ fn daemonize(args []string) {
 	p.set_args(sargs)
 	p.set_environment(os.environ())
 	p.run()
-	// the original ocd process exits; setsid --fork launches the detached daemon.
+	// the original ocwd process exits; setsid --fork launches the detached daemon.
 	exit(0)
 }
 
 fn on_term(_sig os.Signal) {
 	// kill the supervised process groups (use_pgroup => each proc is a group leader)
 	for i := 0; i < 2; i++ {
-		pid := C.ocd_get_pid(i)
+		pid := C.ocwd_get_pid(i)
 		if pid > 0 {
 			C.kill(-pid, 15)
 		}
 	}
-	lfd := C.ocd_get_listen()
+	lfd := C.ocwd_get_listen()
 	if lfd >= 0 {
 		C.close(lfd)
 	}
@@ -400,7 +427,7 @@ fn on_term(_sig os.Signal) {
 }
 
 fn on_hup(_sig os.Signal) {
-	C.ocd_set_reload(1)
+	C.ocwd_set_reload(1)
 }
 
 // ---------------- supervisor ----------------
@@ -412,7 +439,7 @@ fn (mut app App) spawn_proc(name string) {
 	mut p := os.new_process(pr.cmd)
 	p.set_args(pr.args)
 	p.set_work_folder(app.cwd)
-	p.set_environment(build_env(app.conf, pr.is_oc))
+	p.set_environment(build_env(app.conf, pr.is_opencode))
 	p.set_redirect_stdio()
 	p.use_pgroup = true
 	p.run()
@@ -421,12 +448,12 @@ fn (mut app App) spawn_proc(name string) {
 	pr.alive = true
 	pr.started_at = time.unix_now()
 	pr.backoff = 0
-	if pr.is_oc {
-		C.ocd_set_pid(0, p.pid)
+	if pr.is_opencode {
+		C.ocwd_set_pid(0, p.pid)
 	} else {
-		C.ocd_set_pid(1, p.pid)
+		C.ocwd_set_pid(1, p.pid)
 	}
-	log_msg('ocd: started ${name} (pid ${p.pid}) in ${app.cwd}')
+	log_msg('ocwd: started ${name} (pid ${p.pid}) in ${app.cwd}')
 	go app.log_pump(name)
 }
 
@@ -451,8 +478,8 @@ fn (mut app App) stop_proc(pr &Proc) {
 }
 
 fn (mut app App) tick() {
-	if C.ocd_get_reload() == 1 {
-		C.ocd_set_reload(0)
+	if C.ocwd_get_reload() == 1 {
+		C.ocwd_set_reload(0)
 		app.cmd_reload()
 		return
 	}
@@ -460,18 +487,19 @@ fn (mut app App) tick() {
 		return
 	}
 	now := time.unix_now()
-	mut oc := app.procs['opencode'] or { return }
-	mut och := app.procs['openchamber'] or { return }
+	mut opencode_proc := app.procs['opencode'] or { return }
+	mut openchamber_proc := app.procs['openchamber'] or { return }
 	// ensure opencode
-	if oc.enabled {
-		if !oc.alive && !oc.have_proc && oc.next_start <= now {
+	if opencode_proc.enabled {
+		if !opencode_proc.alive && !opencode_proc.have_proc && opencode_proc.next_start <= now {
 			app.spawn_proc('opencode')
 		}
 	}
 	// openchamber may only run once opencode is actually listening
-	oc_listening := oc.alive && !port_free(oc_host, opencode_port)
-	if och.enabled && oc_listening {
-		if !och.alive && !och.have_proc && och.next_start <= now {
+	opencode_listening := opencode_proc.alive && !port_free(service_host, opencode_port)
+	if openchamber_proc.enabled && opencode_listening {
+		if !openchamber_proc.alive && !openchamber_proc.have_proc
+			&& openchamber_proc.next_start <= now {
 			app.spawn_proc('openchamber')
 		}
 	}
@@ -495,11 +523,11 @@ fn (mut app App) on_death(msg DeathMsg) {
 	pr.next_start = time.unix_now() + i64(pr.backoff)
 	pr.have_proc = false
 	pr.alive = false
-	if pr.is_oc {
+	if pr.is_opencode {
 		// opencode died -> stop openchamber (depends on opencode)
 		app.stop_proc(app.procs['openchamber'] or { return })
 	}
-	log_msg('ocd: [${msg.name}] exited (restart #${pr.restarts}); backing off ${pr.backoff}s')
+	log_msg('ocwd: [${msg.name}] exited (restart #${pr.restarts}); backing off ${pr.backoff}s')
 }
 
 fn is_interpreter(cmd0 string) bool {
@@ -584,7 +612,7 @@ fn (mut app App) adopt_existing_proc(name string) {
 		return
 	}
 	cmdline := (os.read_file('/proc/${pid}/cmdline') or { '' }).split('\x00')
-	expected_port := if pr.is_oc { opencode_port.str() } else { openchamber_port.str() }
+	expected_port := if pr.is_opencode { opencode_port.str() } else { openchamber_port.str() }
 	mut has_port := false
 	for part in cmdline {
 		if part == expected_port {
@@ -602,12 +630,12 @@ fn (mut app App) adopt_existing_proc(name string) {
 	pr.backoff = 0
 	pr.next_start = 0
 	pr.restarts = 0
-	if pr.is_oc {
-		C.ocd_set_pid(0, pid)
+	if pr.is_opencode {
+		C.ocwd_set_pid(0, pid)
 	} else {
-		C.ocd_set_pid(1, pid)
+		C.ocwd_set_pid(1, pid)
 	}
-	log_msg('ocd: adopted ${name} (pid ${pid})')
+	log_msg('ocwd: adopted ${name} (pid ${pid})')
 	go app.adoption_watcher(name, pid)
 }
 
@@ -632,7 +660,7 @@ fn (mut app App) cmd_reload() {
 			app.adopt_existing_proc(n)
 		}
 	}
-	log_msg('ocd: reloaded state and configuration')
+	log_msg('ocwd: reloaded state and configuration')
 }
 
 // ---------------- command handlers (run in supervisor goroutine) ----------------
@@ -646,8 +674,8 @@ fn (app App) cmd_status() string {
 		} else if pr.have_proc && !pr.alive {
 			st = 'crashed'
 		}
-		port := if pr.is_oc { opencode_port } else { openchamber_port }
-		listening := !port_free(oc_host, port)
+		port := if pr.is_opencode { opencode_port } else { openchamber_port }
+		listening := !port_free(service_host, port)
 		mut pid := 0
 		if pr.have_proc {
 			pid = pr.p.pid
@@ -743,8 +771,8 @@ fn (app App) version_for_one(name string) string {
 }
 
 fn (app App) cmd_version(target string) string {
-	if target == 'ocd' {
-		return json.encode(AckResp{ ok: true, msg: 'ocd version : ' + daemon_version() })
+	if target == 'ocwd' {
+		return json.encode(AckResp{ ok: true, msg: 'ocwd version : ' + daemon_version() })
 	}
 	mut names := []string{}
 	if target == '' || target == 'all' {
@@ -755,7 +783,7 @@ fn (app App) cmd_version(target string) string {
 		return json.encode(AckResp{ ok: false, msg: 'unknown target: ' + target })
 	}
 	mut lines := []string{}
-	lines << 'ocd version : ' + daemon_version()
+	lines << 'ocwd version : ' + daemon_version()
 	for name in names {
 		lines << app.version_for_one(name)
 	}
@@ -824,7 +852,7 @@ fn (mut app App) graceful_shutdown() {
 	c_close(app.listen_fd)
 	os.rm(pid_path) or {}
 	os.rm(sock_path) or {}
-	log_msg('ocd: shutdown complete')
+	log_msg('ocwd: shutdown complete')
 }
 
 fn (mut app App) handle_req(r Req) {
@@ -1043,22 +1071,24 @@ fn (mut app App) run() {
 
 // ---------------- entry point ----------------
 fn run_daemon(args []string) {
+	ensure_legacy_daemon_stopped()
+	os.mkdir_all(runtime_dir, os.MkdirParams{}) or {}
+	os.mkdir_all(logs_dir, os.MkdirParams{}) or {}
+
 	foreground := has_foreground_flag(args)
-	C.ocd_set_foreground(if foreground { 1 } else { 0 })
+	C.ocwd_set_foreground(if foreground { 1 } else { 0 })
 	redirect_std_to_devnull(foreground)
 
 	if os.exists(pid_path) {
 		raw := os.read_file(pid_path) or { '' }
 		pid := raw.trim_space().int()
 		if pid_alive(pid) {
-			eprintln('ocd: already running (pid ${pid})')
+			eprintln('ocwd: already running (pid ${pid})')
 			exit(1)
 		}
 		os.rm(pid_path) or {}
 	}
-
-	os.mkdir_all(runtime_dir, os.MkdirParams{}) or {}
-	os.mkdir_all(logs_dir, os.MkdirParams{}) or {}
+	migrate_legacy_state()
 
 	mut initial_cwd := ''
 	mut conf_path := default_conf_path
@@ -1073,7 +1103,7 @@ fn run_daemon(args []string) {
 	mut st := load_state()
 	if initial_cwd != '' {
 		if !os.is_dir(initial_cwd) {
-			eprintln('ocd: --cwd is not a directory: ' + initial_cwd)
+			eprintln('ocwd: --cwd is not a directory: ' + initial_cwd)
 			exit(1)
 		}
 		st.cwd = os.real_path(initial_cwd)
@@ -1081,7 +1111,7 @@ fn run_daemon(args []string) {
 	}
 
 	os.write_file(pid_path, os.getpid().str()) or {
-		eprintln('ocd: cannot write pidfile')
+		eprintln('ocwd: cannot write pidfile')
 		exit(1)
 	}
 
@@ -1091,11 +1121,11 @@ fn run_daemon(args []string) {
 
 	lfd := c_listen(sock_path)
 	if lfd < 0 {
-		eprintln('ocd: cannot listen on ' + sock_path)
+		eprintln('ocwd: cannot listen on ' + sock_path)
 		os.rm(pid_path) or {}
 		exit(1)
 	}
-	C.ocd_set_listen(lfd)
+	C.ocwd_set_listen(lfd)
 
 	mut app := &App{
 		cwd:       st.cwd
@@ -1108,40 +1138,42 @@ fn run_daemon(args []string) {
 		tick_chan: chan bool{cap: 4}
 	}
 	app.procs['opencode'] = &Proc{
-		name:    'opencode'
-		cmd:     opencode_bin
-		args:    ['serve', '--port', opencode_port.str(), '--hostname', oc_host, '--print-logs']
-		is_oc:   true
-		enabled: st.procs['opencode'].enabled
-		p:       &os.Process{}
-		logpath: log_path_for('opencode')
+		name:        'opencode'
+		cmd:         opencode_bin
+		args:        ['serve', '--port', opencode_port.str(), '--hostname', service_host,
+			'--print-logs']
+		is_opencode: true
+		enabled:     st.procs['opencode'].enabled
+		p:           &os.Process{}
+		logpath:     log_path_for('opencode')
 	}
 	app.procs['openchamber'] = &Proc{
-		name:    'openchamber'
-		cmd:     openchamber_bin
-		args:    ['serve', '--foreground', '--port', openchamber_port.str(), '--host', oc_host]
-		is_oc:   false
-		enabled: st.procs['openchamber'].enabled
-		p:       &os.Process{}
-		logpath: log_path_for('openchamber')
+		name:        'openchamber'
+		cmd:         openchamber_bin
+		args:        ['serve', '--foreground', '--port', openchamber_port.str(), '--host',
+			service_host]
+		is_opencode: false
+		enabled:     st.procs['openchamber'].enabled
+		p:           &os.Process{}
+		logpath:     log_path_for('openchamber')
 	}
 
 	app.adopt_existing_proc('opencode')
 	app.adopt_existing_proc('openchamber')
 
-	log_msg('ocd: daemon started pid ${os.getpid()}, cwd=${app.cwd}, socket=${sock_path}')
+	log_msg('ocwd: daemon started pid ${os.getpid()}, cwd=${app.cwd}, socket=${sock_path}')
 	app.run()
 	exit(0)
 }
 
 fn usage() {
 	eprintln('usage:')
-	eprintln('  ocd [--foreground|--no-daemon] [--cwd <dir>] [--config <path>]')
-	eprintln('  ocd --daemon')
-	eprintln('  ocd --reload')
-	eprintln('  ocd --shutdown')
-	eprintln('  ocd --version')
-	eprintln('  ocd --help')
+	eprintln('  ocwd [--foreground|--no-daemon] [--cwd <dir>] [--config <path>]')
+	eprintln('  ocwd --daemon')
+	eprintln('  ocwd --reload')
+	eprintln('  ocwd --shutdown')
+	eprintln('  ocwd --version')
+	eprintln('  ocwd --help')
 }
 
 fn main() {
@@ -1149,10 +1181,10 @@ fn main() {
 	for a in args {
 		if a == '--version' {
 			vm := vmod.decode(@VMOD_FILE) or {
-				eprintln('ocd: cannot read v.mod: ' + err.msg())
+				eprintln('ocwd: cannot read v.mod: ' + err.msg())
 				exit(1)
 			}
-			println('ocd ' + vm.version)
+			println('ocwd ' + vm.version)
 			exit(0)
 		}
 		if a == '--help' || a == '-h' {

@@ -27,7 +27,7 @@ struct C.sockaddr_un {
 }
 
 // ---- shared runtime path ----
-const sock_path = '/run/ocd/ocd.sock'
+const sock_path = '/run/ocwd/ocwd.sock'
 
 // ---- protocol types ----
 struct Command {
