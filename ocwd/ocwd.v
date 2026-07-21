@@ -551,7 +551,7 @@ fn running_version_of(pid int) string {
 	return binary_version('/proc/${pid}/exe')
 }
 
-fn find_pid_by_cmd(cmd string) int {
+fn find_pid_by_cmd(cmd string, port string) int {
 	target_real := os.real_path(cmd)
 	base := cmd.all_after_last('/')
 	entries := os.ls('/proc') or { return 0 }
@@ -574,19 +574,27 @@ fn find_pid_by_cmd(cmd string) int {
 			continue
 		}
 		cmdline := (os.read_file('/proc/${entry}/cmdline') or { '' }).split('\x00')
+		mut matches_cmd := false
+		mut has_port := false
 		for part in cmdline {
 			if part == '' {
 				continue
 			}
+			if part == port {
+				has_port = true
+			}
 			if target_real != '' && os.real_path(part) == target_real {
-				return pid
+				matches_cmd = true
 			}
 			if part.all_after_last('/') == base {
-				return pid
+				matches_cmd = true
 			}
 			if part.contains(base) {
-				return pid
+				matches_cmd = true
 			}
+		}
+		if matches_cmd && has_port {
+			return pid
 		}
 	}
 	return 0
@@ -607,20 +615,9 @@ fn (mut app App) adopt_existing_proc(name string) {
 	if pr.have_proc || !pr.enabled {
 		return
 	}
-	pid := find_pid_by_cmd(pr.cmd)
-	if pid <= 0 {
-		return
-	}
-	cmdline := (os.read_file('/proc/${pid}/cmdline') or { '' }).split('\x00')
 	expected_port := if pr.is_opencode { opencode_port.str() } else { openchamber_port.str() }
-	mut has_port := false
-	for part in cmdline {
-		if part == expected_port {
-			has_port = true
-			break
-		}
-	}
-	if !has_port {
+	pid := find_pid_by_cmd(pr.cmd, expected_port)
+	if pid <= 0 {
 		return
 	}
 	pr.alive = true
