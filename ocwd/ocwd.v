@@ -396,7 +396,7 @@ fn daemonize(args []string) {
 	exe := os.executable()
 	mut sargs := ['--fork', exe, daemonized_flag]
 	for i := 1; i < args.len; i++ {
-		if is_foreground_flag(args[i]) || args[i] == daemonized_flag {
+		if is_foreground_flag(args[i]) || args[i] == daemonized_flag || args[i] == '--daemon' {
 			continue
 		}
 		sargs << args[i]
