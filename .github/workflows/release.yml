@@ -9,33 +9,60 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up V
-        uses: vlang/setup-v@v1
+        uses: vlang/setup-v@v1.7
         with:
           version: e29bc95
 
       - name: Build binaries
         run: |
-          mkdir -p dist/manage-oc-linux-x64
-          v -prod ocwd/ -o dist/manage-oc-linux-x64/ocwd
-          v -prod ocw/ -o dist/manage-oc-linux-x64/ocw
-          v -prod procwd/ -o dist/manage-oc-linux-x64/procwd
+          mkdir -p dist/manage-oc-linux-${{ matrix.arch }}
+          v -prod ocwd/ -o dist/manage-oc-linux-${{ matrix.arch }}/ocwd
+          v -prod ocw/ -o dist/manage-oc-linux-${{ matrix.arch }}/ocw
+          v -prod procwd/ -o dist/manage-oc-linux-${{ matrix.arch }}/procwd
 
       - name: Package binaries
         run: |
           cd dist
-          tar -czf manage-oc-linux-x64.tar.gz manage-oc-linux-x64
+          tar -czf manage-oc-linux-${{ matrix.arch }}.tar.gz manage-oc-linux-${{ matrix.arch }}
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: manage-oc-linux-${{ matrix.arch }}
+          path: dist/manage-oc-linux-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/manage-oc-linux-x64.tar.gz
+            dist/manage-oc-linux-arm64.tar.gz
           generate_release_notes: true
+          fail_on_unmatched_files: true
