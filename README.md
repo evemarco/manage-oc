@@ -68,7 +68,7 @@ openchamber provides a more complete interface than opencode web, while remainin
 On Linux with an x86_64 or ARM64 CPU, download and install the latest release binaries in `/usr/local/bin` with:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/evemarco/manage-oc/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/evemarco/manage-oc/master/install.sh | sh
 ```
 
 The installer checks the installed versions of `ocwd`, `ocw`, and `procwd`, then selects the `manage-oc-linux-x64` or `manage-oc-linux-arm64` release for the current CPU. It only downloads a release when one or more binaries are missing or older. Run the same command again to update an existing installation. Root privileges are required; when needed, the installer uses `sudo`.
