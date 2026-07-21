@@ -63,6 +63,20 @@ openchamber provides a more complete interface than opencode web, while remainin
 
 ## Build & install
 
+### Install the latest release
+
+On Linux with an x86_64 or ARM64 CPU, download and install the latest release binaries in `/usr/local/bin` with:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/evemarco/manage-oc/main/install.sh | sh
+```
+
+The installer checks the installed versions of `ocwd`, `ocw`, and `procwd`, then selects the `manage-oc-linux-x64` or `manage-oc-linux-arm64` release for the current CPU. It only downloads a release when one or more binaries are missing or older. Run the same command again to update an existing installation. Root privileges are required; when needed, the installer uses `sudo`.
+
+For another operating system, CPU architecture, or an incompatible Linux runtime, compile from source instead.
+
+### Build from source
+
 ```bash
 ./build.sh
 ```
@@ -170,11 +184,15 @@ ocw restart [opencode|openchamber|all]
 ocw reload
 ocw logs    [opencode|openchamber] [-f] [tail N]
 ocw version [opencode|openchamber|ocwd|all]
+ocw check
+ocw update
 ocw shutdown
 ocw help              # show usage (also: --help, -h)
 ```
 
 Results are printed to stdout; errors go to stderr. Exit codes: `0` on success, `1` for daemon or protocol errors (including unknown targets), `2` for unknown commands.
+
+`ocw check` and `ocw update` work without a running daemon. `ocw check` compares the installed manage-oc version with the latest GitHub release and reports whether an update is available. `ocw update` downloads and validates the matching Linux x64 or ARM64 release, then atomically replaces `ocwd`, `ocw`, and `procwd` in `/usr/local/bin` only when the release is newer. On a non-root installation it uses `sudo` when required. Unsupported operating systems, CPU architectures, and incompatible runtime binaries are rejected with the exact reason.
 
 Use `ocw version` to check the versions of `ocw`, `ocwd`, and the running supervised processes. It also warns when a running binary no longer matches the on-disk executable (for example after an update).
 
@@ -235,6 +253,15 @@ ocw version
 ocw version opencode
 ocw version openchamber
 ```
+
+Check for a newer manage-oc release, then install it when available:
+
+```bash
+ocw check
+ocw update
+```
+
+After an update, restart `ocwd` when convenient so the running daemon uses the new binary.
 
 ## The `procwd` helper
 

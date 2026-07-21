@@ -18,7 +18,12 @@ It consists of a Unix-socket daemon (`ocwd`), a CLI client (`ocw`), and a tiny `
 ├── ocw/
 │   ├── AGENTS.md      # CLI client knowledge base
 │   ├── common.v       # same as root common.v
-│   └── ocw.v          # CLI client: status | cwd | start | stop | restart | reload | logs | version | shutdown | help
+│   ├── ocw.v          # CLI dispatch and usage
+│   ├── socket.v       # AF_UNIX client transport
+│   ├── daemon_commands.v # daemon-backed CLI commands
+│   ├── latest.v       # online version sources
+│   ├── update.v       # manage-oc check/update logic
+│   └── installer.v    # secure atomic binary installation
 ├── ocwd/
 │   ├── AGENTS.md      # daemon knowledge base
 │   ├── common.v       # same as root common.v
@@ -34,7 +39,9 @@ It consists of a Unix-socket daemon (`ocwd`), a CLI client (`ocw`), and a tiny `
 |------|----------|-------|
 | Build / install binaries | `build.sh` | builds `ocwd`, `ocw` and `procwd` into `/usr/local/bin` |
 | Daemon supervisor logic | `ocwd/ocwd.v` | spawn, restart, backoff, logging, signal handling, process adoption, reload |
-| CLI client commands | `ocw/ocw.v` | `main()` dispatch + `do_*` helpers (including version, reload) |
+| CLI client dispatch | `ocw/ocw.v` | `main()` dispatch + usage |
+| CLI daemon commands | `ocw/daemon_commands.v` | status, cwd, process control, logs, version |
+| Release check/update | `ocw/update.v` | GitHub release comparison, validation, installation |
 | Shared protocol structs | `common.v` / `ocw/common.v` / `ocwd/common.v` | `Command`, `StatusResp`, `AckResp`, socket helpers |
 | C globals for signal handler | `ocwd/globals.h` | `g_ocwd_pids`, `g_ocwd_listen`, `g_ocwd_reload`, `g_ocwd_foreground` |
 | Process cwd / pid lookup | `procwd/procwd.v` | reads `/proc/<pid>/cwd` and scans `/proc` for process names |
@@ -57,9 +64,10 @@ It consists of a Unix-socket daemon (`ocwd`), a CLI client (`ocw`), and a tiny `
 | `find_pid_by_cmd` | fn | `ocwd/ocwd.v` | scans `/proc` to find a process matching a command name |
 | `handle_client` | fn | `ocwd/ocwd.v` | decodes JSON command, routes to `handle_req` |
 | `main` | fn | `ocw/ocw.v` | CLI argument dispatch (`status`, `cwd`, `restart`, etc.) |
-| `print_latest` | fn | `ocw/ocw.v` | fetches latest online versions (GitHub releases / npm) in parallel; silent when offline |
-| `send_recv_one` | fn | `ocw/ocw.v` | connects to socket, sends JSON, returns one line |
-| `c_connect` | fn | `ocw/ocw.v` | AF_UNIX client socket setup |
+| `print_latest` | fn | `ocw/latest.v` | fetches latest online versions (GitHub releases / npm) in parallel; silent when offline |
+| `do_check`/`do_update` | fn | `ocw/update.v` | checks and installs manage-oc releases without the daemon |
+| `send_recv_one` | fn | `ocw/socket.v` | connects to socket, sends JSON, returns one line |
+| `c_connect` | fn | `ocw/socket.v` | AF_UNIX client socket setup |
 | `c_listen` | fn | `ocwd/ocwd.v` | AF_UNIX server socket setup + bind/listen |
 | `c_recv_line` | fn | `common.v:70` | reads one newline-terminated line from socket |
 | `sock_path` | const | `common.v:30` | `/run/ocwd/ocwd.sock` |
@@ -132,6 +140,8 @@ ocw start   [opencode|openchamber|all]
 ocw reload
 ocw logs    [opencode|openchamber] [-f] [tail N]
 ocw version [opencode|openchamber|ocwd|all]
+ocw check
+ocw update
 ocw shutdown
 ocw help              # usage on stdout (also: --help, -h)
 

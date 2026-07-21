@@ -7,16 +7,13 @@
 
 | Symbol | Location | Role |
 |--------|----------|------|
-| `main` | `ocw.v` | dispatches subcommands |
-| `c_connect` | `ocw.v` | creates AF_UNIX client socket |
-| `connect` | `ocw.v` | wraps `c_connect`; exits if socket missing |
-| `send_recv_one` | `ocw.v` | sends one JSON command and reads one response |
-| `do_status` | `ocw.v` | pretty-prints daemon status table |
-| `do_cwd` | `ocw.v` | `ocw cwd` and `ocw cwd set [dir]` |
-| `do_simple` | `ocw.v` | `restart`, `stop`, `start`, `reload`, `shutdown` |
-| `do_logs` | `ocw.v` | streaming logs with `-f` and optional `tail N` |
-| `do_version` | `ocw.v` | `ocw version` and `ocw version <target>` |
-| `print_latest`/`fetch_latest` | `ocw.v` | fetches online latest versions in parallel (GitHub releases / npm), silent on failure |
+| `main` | `ocw.v` | dispatches subcommands and prints usage |
+| `c_connect`/`send_recv_one` | `socket.v` | AF_UNIX client transport |
+| `do_status`/`do_cwd`/`do_logs` | `daemon_commands.v` | daemon-backed CLI commands |
+| `do_version` | `daemon_commands.v` | `ocw version` and `ocw version <target>` |
+| `print_latest`/`fetch_latest` | `latest.v` | fetches online latest versions in parallel (GitHub releases / npm) |
+| `do_check`/`do_update` | `update.v` | manage-oc release check, validation, and atomic installation |
+| `BinaryInstaller`/`UpdateTools` | `installer.v` | private temp directory and fixed-path privileged installation |
 | `usage` | `ocw.v` | prints usage to stdout (`false`) or stderr (`true`) |
 | `is_int` | `ocw.v` | validates numeric tail argument |
 | `Command`/`StatusResp`/`AckResp` | `common.v` | shared protocol structs |
@@ -40,6 +37,8 @@ ocw start   [opencode|openchamber|all]
 ocw reload
 ocw logs    [opencode|openchamber] [-f] [tail N]
 ocw version [opencode|openchamber|ocwd|all]
+ocw check
+ocw update
 ocw shutdown
 ocw help              # usage on stdout (also: --help, -h)
 ```
@@ -50,3 +49,4 @@ ocw help              # usage on stdout (also: --help, -h)
 - Unknown commands and usage errors exit with code 2; daemon or protocol errors exit with code 1.
 - stdout/stderr convention: results go to stdout, errors to stderr. `usage(false)` prints to stdout (`ocw help`), `usage(true)` prints to stderr (after an unknown command). Keep `!ack.ok` checks printing via `eprintln` with `exit(1)`.
 - Online version checks live in the client, never in `ocwd` (its `select` loop must not block on network). Sources: GitHub releases for opencode (`anomalyco/opencode`) and manage-oc (`evemarco/manage-oc`), npm registry for openchamber (`@openchamber/web`). 2s read timeout, parallel goroutines, silent on any failure.
+- `check` and `update` are daemon-independent. `update` only installs a strictly newer semantic version, validates all three downloaded binaries before replacing anything, and selects x64 or ARM64 from `uname`.
