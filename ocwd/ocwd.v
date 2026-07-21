@@ -15,6 +15,8 @@ fn C.ocwd_get_pid(int) int
 fn C.ocwd_set_pid(int, int)
 fn C.ocwd_get_reload() int
 fn C.ocwd_set_reload(int)
+fn C.ocwd_get_restart() int
+fn C.ocwd_set_restart(int)
 fn C.ocwd_get_foreground() int
 fn C.ocwd_set_foreground(int)
 
@@ -354,6 +356,30 @@ fn do_reload() {
 	exit(0)
 }
 
+fn has_restart_flag(args []string) bool {
+	for a in args {
+		if a == '--restart' {
+			return true
+		}
+	}
+	return false
+}
+
+fn do_restart() {
+	if !os.exists(pid_path) {
+		eprintln('ocwd: not running (no pid file)')
+		exit(1)
+	}
+	raw := os.read_file(pid_path) or { '' }
+	pid := raw.trim_space().int()
+	if pid <= 0 || C.kill(pid, 12) != 0 {
+		eprintln('ocwd: cannot signal daemon (pid ${pid})')
+		exit(1)
+	}
+	println('ocwd: restart signaled to daemon pid ${pid}')
+	exit(0)
+}
+
 fn has_shutdown_flag(args []string) bool {
 	for a in args {
 		if a == '--shutdown' {
@@ -430,6 +456,42 @@ fn on_hup(_sig os.Signal) {
 	C.ocwd_set_reload(1)
 }
 
+fn on_usr2(_sig os.Signal) {
+	C.ocwd_set_restart(1)
+}
+
+fn current_environment() []string {
+	env := os.environ()
+	mut values := []string{cap: env.len}
+	for key, value in env {
+		values << '${key}=${value}'
+	}
+	return values
+}
+
+fn (mut app App) self_restart() {
+	C.ocwd_set_restart(0)
+	exe := os.executable().replace(' (deleted)', '')
+	check := os.execute('${os.quoted_path(exe)} --version')
+	if check.exit_code != 0 {
+		log_msg('ocwd: restart aborted; new binary failed --version: ${check.output.trim_space()}')
+		return
+	}
+	mut args := [daemonized_flag, '--config', app.conf_path]
+	if has_foreground_flag(os.args) {
+		args = ['--no-daemon', '--config', app.conf_path]
+	}
+	log_msg('ocwd: re-executing ${exe}; supervised processes are preserved')
+	c_close(app.listen_fd)
+	C.ocwd_set_listen(-1)
+	os.rm(sock_path) or {}
+	os.rm(pid_path) or {}
+	os.execve(exe, args, current_environment()) or {
+		eprintln('ocwd: restart failed: ${err.msg()}')
+		exit(1)
+	}
+}
+
 // ---------------- supervisor ----------------
 fn (mut app App) spawn_proc(name string) {
 	mut pr := app.procs[name] or { return }
@@ -481,6 +543,10 @@ fn (mut app App) tick() {
 	if C.ocwd_get_reload() == 1 {
 		C.ocwd_set_reload(0)
 		app.cmd_reload()
+		return
+	}
+	if C.ocwd_get_restart() == 1 {
+		app.self_restart()
 		return
 	}
 	if app.shutting {
@@ -1115,6 +1181,7 @@ fn run_daemon(args []string) {
 	os.signal_opt(.term, on_term) or {}
 	os.signal_opt(.int, on_term) or {}
 	os.signal_opt(.hup, on_hup) or {}
+	os.signal_opt(.usr2, on_usr2) or {}
 
 	lfd := c_listen(sock_path)
 	if lfd < 0 {
@@ -1168,6 +1235,7 @@ fn usage() {
 	eprintln('  ocwd [--foreground|--no-daemon] [--cwd <dir>] [--config <path>]')
 	eprintln('  ocwd --daemon')
 	eprintln('  ocwd --reload')
+	eprintln('  ocwd --restart')
 	eprintln('  ocwd --shutdown')
 	eprintln('  ocwd --version')
 	eprintln('  ocwd --help')
@@ -1191,6 +1259,10 @@ fn main() {
 	}
 	if has_reload_flag(args) {
 		do_reload()
+		return
+	}
+	if has_restart_flag(args) {
+		do_restart()
 		return
 	}
 	if has_shutdown_flag(args) {
