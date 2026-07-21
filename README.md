@@ -142,6 +142,16 @@ Reload a running daemon's configuration without restarting it:
 ocwd --reload
 ```
 
+Restart the daemon with the on-disk binary (after a build or update) while keeping the supervised processes running:
+
+```bash
+ocwd --restart
+```
+
+The daemon validates the new binary, re-executes itself, and adopts the already-running `opencode` and `openchamber` processes, so they are not interrupted. Use this after `./build.sh` or `ocw update` to make the daemon run the new version.
+
+The daemon keeps the **same PID** across the restart: `execve` replaces its code in place instead of creating a new process. To confirm a restart happened, check the log (`re-executing` / `adopted` lines), `/proc/$(cat /run/ocwd/ocwd.pid)/exe`, or `ocw version ocwd`.
+
 Show daemon version or help:
 
 ```bash
@@ -261,7 +271,7 @@ ocw check
 ocw update
 ```
 
-After an update, restart `ocwd` when convenient so the running daemon uses the new binary.
+After an update, run `ocwd --restart` so the daemon re-executes the new binary; the supervised processes are adopted and keep running without interruption.
 
 ## The `procwd` helper
 

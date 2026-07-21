@@ -8,7 +8,7 @@ Daemon-specific code for `ocwd`, the Unix-socket supervisor that manages opencod
 
 | Symbol | Location | Role |
 |--------|----------|------|
-| `main` | `ocwd.v` | Forks via `daemonize` unless `--foreground`/`--no-daemon` is passed. Handles `--version`, `--help`, `--reload`, `--shutdown`. |
+| `main` | `ocwd.v` | Forks via `daemonize` unless `--foreground`/`--no-daemon` is passed. Handles `--version`, `--help`, `--reload`, `--restart`, `--shutdown`. |
 | `run_daemon` | `ocwd.v` | pidfile, socket bind, signal setup, `App.run()`. Parses `--cwd`, `--config`. |
 | `App` | `ocwd.v` | Supervisor state: process slots, channels, listen fd, tick timer, conf path. |
 | `App.run` | `ocwd.v` | `select` loop on `req_ch`, `death_ch`, and `tick_ch`. |
@@ -16,7 +16,8 @@ Daemon-specific code for `ocwd`, the Unix-socket supervisor that manages opencod
 | `App.on_death` | `ocwd.v` | Back-off, respawn, and cascade stop of openchamber. |
 | `App.cmd_reload` | `ocwd.v` | Re-reads `state.json` and configured env file, adjusts processes. |
 | `App.cmd_version` | `ocwd.v` | Reports running and on-disk versions, detects mismatches. |
-| `App.adopt_existing_proc` | `ocwd.v` | Adopts an already-running process on daemon startup. |
+| `App.adopt_existing_proc` | `ocwd.v` | Adopts an already-running process on daemon startup or after self-exec. |
+| `App.self_restart` | `ocwd.v` | Re-executes the on-disk binary on SIGUSR2 (from `--restart`), preserving supervised processes. |
 | `spawn_proc` | `ocwd.v` | Creates `os.Process`, sets env/cwd/pgroup, spawns `log_pump`. |
 | `restart_proc` | `ocwd.v` | Stops a process without clearing `have_proc`; the death event drives respawn. |
 | `log_pump` | `ocwd.v` | Per-process goroutine draining stdout/stderr into a log file and emitting `DeathMsg`. |
@@ -67,6 +68,9 @@ ocwd --env-file /path/to/env.conf
 # Reload a running daemon without restarting it
 ocwd --reload
 
+# Re-exec the running daemon with the on-disk binary (supervised processes preserved)
+ocwd --restart
+
 # Stop the running daemon completely (supervised processes included)
 ocwd --shutdown
 
@@ -87,4 +91,5 @@ v vet .
 - `openchamber` will never be started by `App.tick` if opencode is not healthy; restarting opencode automatically cascades to stopping openchamber first.
 - Logs are written per-process to files under the configured log directory; the `logs` command streams the tail of those files over the Unix socket.
 - `ocwd --config` and `ocwd --env-file` override the default `/etc/opencode-web.conf` path; `ocw reload` re-reads the configured file on a running daemon.
-- `ocwd` can adopt already-running `opencode` / `openchamber` processes on startup, provided their `cmdline` contains the expected `--port` argument.
+- `ocwd` can adopt already-running `opencode` / `openchamber` processes on startup, provided their `cmdline` contains the expected `--port` argument. The scan requires both the command path and the port to match, so unrelated processes with a similar name (e.g. an interactive `opencode` TUI client) are never adopted.
+- `ocwd --restart` sends SIGUSR2 to the running daemon; on the next supervisor tick it validates the on-disk binary with `--version`, removes the socket and pidfile, then re-executes itself with the same arguments. The pidfile must be removed before `execve` or the new daemon detects its own pid and exits with "already running". After the exec, the new daemon adopts the supervised processes, so their pids keep running without interruption. The daemon keeps the **same pid** across the restart because `execve` replaces the process image in place; the pidfile is rewritten with the identical value.

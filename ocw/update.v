@@ -182,7 +182,7 @@ fn update_manage_oc() ! {
 		installer.install(source, name)!
 	}
 	println('Installed manage-oc ${latest} in ${install_dir}.')
-	println('Restart ocwd to run the updated daemon binary.')
+	println('Run: ocwd --restart (supervised processes keep running).')
 }
 
 fn do_update() {

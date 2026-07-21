@@ -122,6 +122,9 @@ ocwd --env-file /path/to/env.conf
 # Reload a running daemon without restarting it
 ocwd --reload
 
+# Re-exec the running daemon with the on-disk binary (supervised processes preserved)
+ocwd --restart
+
 # Stop the running daemon completely (supervised processes included)
 ocwd --shutdown
 
