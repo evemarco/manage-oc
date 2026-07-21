@@ -1,6 +1,6 @@
 module main
 
-import json
+import json2
 import net.http
 import time
 
@@ -55,10 +55,10 @@ fn fetch_latest(req LatestReq) string {
 		return ''
 	}
 	if req.npm {
-		r := json.decode(NpmRelease, resp.body) or { return '' }
+		r := json2.decode[NpmRelease](resp.body) or { return '' }
 		return r.version
 	}
-	r := json.decode(GhRelease, resp.body) or { return '' }
+	r := json2.decode[GhRelease](resp.body) or { return '' }
 	return r.tag_name.trim_left('v')
 }
 

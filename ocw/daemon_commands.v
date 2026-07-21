@@ -1,12 +1,12 @@
 module main
 
 import os
-import json
+import json2
 import v.vmod
 
 fn do_status() {
 	resp := send_recv_one(Command{ op: 'status' })
-	st := json.decode(StatusResp, resp) or {
+	st := json2.decode[StatusResp](resp) or {
 		eprintln('ocw: bad response: ' + resp)
 		exit(1)
 	}
@@ -31,7 +31,7 @@ fn do_status() {
 fn do_cwd(rest []string) {
 	if rest.len == 0 {
 		resp := send_recv_one(Command{ op: 'cwd', arg: 'get' })
-		ack := json.decode(AckResp, resp) or {
+		ack := json2.decode[AckResp](resp) or {
 			eprintln('ocw: bad response: ' + resp)
 			exit(1)
 		}
@@ -49,7 +49,7 @@ fn do_cwd(rest []string) {
 		dir = rest[0]
 	}
 	resp := send_recv_one(Command{ op: 'cwd', arg: 'set', target: dir })
-	ack := json.decode(AckResp, resp) or {
+	ack := json2.decode[AckResp](resp) or {
 		eprintln('ocw: bad response: ' + resp)
 		exit(1)
 	}
@@ -66,7 +66,7 @@ fn do_simple(op string, args []string) {
 		target = args[2]
 	}
 	resp := send_recv_one(Command{ op: op, target: target })
-	ack := json.decode(AckResp, resp) or {
+	ack := json2.decode[AckResp](resp) or {
 		eprintln('ocw: bad response: ' + resp)
 		exit(1)
 	}
@@ -106,7 +106,7 @@ fn do_logs(rest []string) {
 	}
 	fd := connect()
 	defer { c_close(fd) }
-	c_send_str(fd, json.encode(cmd) + '\n')
+	c_send_str(fd, json2.encode(cmd) + '\n')
 	if follow {
 		for {
 			line := c_recv_line(fd)
@@ -139,7 +139,7 @@ fn do_version(args []string) {
 		target = args[2]
 	}
 	resp := send_recv_one(Command{ op: 'version', target: target })
-	ack := json.decode(AckResp, resp) or {
+	ack := json2.decode[AckResp](resp) or {
 		eprintln('ocw: bad response: ' + resp)
 		exit(1)
 	}

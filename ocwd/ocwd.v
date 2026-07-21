@@ -3,7 +3,7 @@ module main
 import os
 import net
 import time
-import json
+import json2
 import v.vmod
 
 #include "globals.h"
@@ -135,7 +135,7 @@ fn load_state() OcwdState {
 		return st
 	}
 	raw := os.read_file(state_path) or { return st }
-	mut decoded := json.decode(OcwdState, raw) or { return st }
+	mut decoded := json2.decode[OcwdState](raw) or { return st }
 	if decoded.cwd.len == 0 {
 		decoded.cwd = '/root'
 	}
@@ -153,7 +153,7 @@ fn load_state() OcwdState {
 }
 
 fn save_state(st OcwdState) {
-	os.write_file(state_path, json.encode(st)) or {
+	os.write_file(state_path, json2.encode(st)) or {
 		eprintln('ocwd: cannot save state: ' + err.msg())
 	}
 }
@@ -695,7 +695,7 @@ fn (app App) cmd_status() string {
 			restarts:   pr.restarts
 		}
 	}
-	return json.encode(StatusResp{ daemon_pid: os.getpid(), cwd: app.cwd, procs: procs })
+	return json2.encode(StatusResp{ daemon_pid: os.getpid(), cwd: app.cwd, procs: procs })
 }
 
 fn binary_version(exe string) string {
@@ -772,7 +772,7 @@ fn (app App) version_for_one(name string) string {
 
 fn (app App) cmd_version(target string) string {
 	if target == 'ocwd' {
-		return json.encode(AckResp{ ok: true, msg: 'ocwd version : ' + daemon_version() })
+		return json2.encode(AckResp{ ok: true, msg: 'ocwd version : ' + daemon_version() })
 	}
 	mut names := []string{}
 	if target == '' || target == 'all' {
@@ -780,22 +780,22 @@ fn (app App) cmd_version(target string) string {
 	} else if target in app.procs {
 		names = [target]
 	} else {
-		return json.encode(AckResp{ ok: false, msg: 'unknown target: ' + target })
+		return json2.encode(AckResp{ ok: false, msg: 'unknown target: ' + target })
 	}
 	mut lines := []string{}
 	lines << 'ocwd version : ' + daemon_version()
 	for name in names {
 		lines << app.version_for_one(name)
 	}
-	return json.encode(AckResp{ ok: true, msg: lines.join('\n') })
+	return json2.encode(AckResp{ ok: true, msg: lines.join('\n') })
 }
 
 fn (mut app App) cmd_cwd_set(dir string) string {
 	if dir == '' {
-		return json.encode(AckResp{ ok: false, msg: 'no directory given' })
+		return json2.encode(AckResp{ ok: false, msg: 'no directory given' })
 	}
 	if !os.is_dir(dir) {
-		return json.encode(AckResp{ ok: false, msg: 'not a directory: ' + dir })
+		return json2.encode(AckResp{ ok: false, msg: 'not a directory: ' + dir })
 	}
 	app.cwd = os.real_path(dir)
 	mut st := load_state()
@@ -803,20 +803,20 @@ fn (mut app App) cmd_cwd_set(dir string) string {
 	save_state(st)
 	app.restart_proc('opencode')
 	app.restart_proc('openchamber')
-	return json.encode(AckResp{ ok: true, msg: 'cwd set to ' + app.cwd + '; procs restarting' })
+	return json2.encode(AckResp{ ok: true, msg: 'cwd set to ' + app.cwd + '; procs restarting' })
 }
 
 fn (mut app App) cmd_restart(target string) string {
 	if target == 'all' || target == '' {
 		app.restart_proc('opencode')
 		app.restart_proc('openchamber')
-		return json.encode(AckResp{ ok: true, msg: 'restarting all' })
+		return json2.encode(AckResp{ ok: true, msg: 'restarting all' })
 	}
 	if target in app.procs {
 		app.restart_proc(target)
-		return json.encode(AckResp{ ok: true, msg: 'restarting ' + target })
+		return json2.encode(AckResp{ ok: true, msg: 'restarting ' + target })
 	}
-	return json.encode(AckResp{ ok: false, msg: 'unknown target: ' + target })
+	return json2.encode(AckResp{ ok: false, msg: 'unknown target: ' + target })
 }
 
 fn (mut app App) cmd_set_enabled(target string, enable bool) string {
@@ -826,7 +826,7 @@ fn (mut app App) cmd_set_enabled(target string, enable bool) string {
 	} else if target in app.procs {
 		names = [target]
 	} else {
-		return json.encode(AckResp{ ok: false, msg: 'unknown target: ' + target })
+		return json2.encode(AckResp{ ok: false, msg: 'unknown target: ' + target })
 	}
 	for n in names {
 		mut pr := app.procs[n] or { continue }
@@ -838,7 +838,7 @@ fn (mut app App) cmd_set_enabled(target string, enable bool) string {
 		}
 	}
 	verb := if enable { 'starting' } else { 'stopping' }
-	return json.encode(AckResp{ ok: true, msg: verb + ' ' + names.join(', ') })
+	return json2.encode(AckResp{ ok: true, msg: verb + ' ' + names.join(', ') })
 }
 
 fn (mut app App) graceful_shutdown() {
@@ -866,13 +866,13 @@ fn (mut app App) handle_req(r Req) {
 		}
 		'reload' {
 			app.cmd_reload()
-			resp = json.encode(AckResp{ ok: true, msg: 'reloaded state and configuration' })
+			resp = json2.encode(AckResp{ ok: true, msg: 'reloaded state and configuration' })
 		}
 		'cwd' {
 			if r.cmd.arg == 'set' {
 				resp = app.cmd_cwd_set(r.cmd.target)
 			} else {
-				resp = json.encode(AckResp{ ok: true, msg: app.cwd })
+				resp = json2.encode(AckResp{ ok: true, msg: app.cwd })
 			}
 		}
 		'restart' {
@@ -885,11 +885,11 @@ fn (mut app App) handle_req(r Req) {
 			resp = app.cmd_set_enabled(r.cmd.target, true)
 		}
 		'shutdown' {
-			resp = json.encode(AckResp{ ok: true, msg: 'shutting down' })
+			resp = json2.encode(AckResp{ ok: true, msg: 'shutting down' })
 			app.graceful_shutdown()
 		}
 		else {
-			resp = json.encode(AckResp{ ok: false, msg: 'unknown op: ' + r.cmd.op })
+			resp = json2.encode(AckResp{ ok: false, msg: 'unknown op: ' + r.cmd.op })
 		}
 	}
 
@@ -998,8 +998,8 @@ fn handle_client(app &App, cfd int) {
 		c_close(cfd)
 		return
 	}
-	cmd := json.decode(Command, line) or {
-		c_send_str(cfd, json.encode(AckResp{ ok: false, msg: 'bad command' }) + '\n')
+	cmd := json2.decode[Command](line) or {
+		c_send_str(cfd, json2.encode(AckResp{ ok: false, msg: 'bad command' }) + '\n')
 		c_close(cfd)
 		return
 	}

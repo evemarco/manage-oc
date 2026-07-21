@@ -1,6 +1,6 @@
 module main
 
-import json
+import json2
 
 fn c_connect(path string) int {
 	fd := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
@@ -33,6 +33,6 @@ fn connect() int {
 fn send_recv_one(cmd Command) string {
 	fd := connect()
 	defer { c_close(fd) }
-	c_send_str(fd, json.encode(cmd) + '\n')
+	c_send_str(fd, json2.encode(cmd) + '\n')
 	return c_recv_line(fd)
 }

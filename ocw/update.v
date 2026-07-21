@@ -1,6 +1,6 @@
 module main
 
-import json
+import json2
 import net.http
 import os
 import semver
@@ -81,7 +81,7 @@ fn fetch_latest_manage_oc() !string {
 	if resp.status_code != 200 {
 		return error('GitHub release check returned HTTP ${resp.status_code}')
 	}
-	release := json.decode(GhRelease, resp.body)!
+	release := json2.decode[GhRelease](resp.body)!
 	if !release.tag_name.starts_with('v') {
 		return error('latest release has an invalid tag: ${release.tag_name}')
 	}
